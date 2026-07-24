@@ -164,12 +164,20 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 * [x] Ne pas télécharger, arrêter ou réinstaller un composant déjà à jour.
 * [x] Afficher clairement les composants conservés dans le plan de mise à jour.
 
-## 9. Composition validée
+## 9. Mise à jour de l'Installer
+
+* [x] Vérifier la dernière release stable avant la mise à jour de la plateforme.
+* [x] Télécharger et vérifier le wheel officiel de l'Installer.
+* [x] Remplacer la version installée dans le même environnement virtuel.
+* [x] Relancer automatiquement `ohana update` avec la nouvelle version.
+* [x] Retenter les erreurs HTTP GitHub transitoires.
+
+## 10. Composition validée
 
 * [x] Ohana-Platform 1.0.3.
 * [x] Ohana-Agent 1.2.0.
 * [x] Ohana-Vision 1.2.0.
-* [x] 187 tests réussis.
+* [x] 195 tests réussis.
 
 ---
 

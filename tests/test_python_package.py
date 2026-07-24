@@ -13,6 +13,7 @@ from ohana_installer.python_package import (
     get_environment_executable,
     inspect_installed_component,
     install_wheel,
+    upgrade_wheel,
     verify_component_command,
 )
 
@@ -126,6 +127,47 @@ def test_install_wheel_runs_environment_pip(
         str(pip_path),
         "install",
         "--disable-pip-version-check",
+        str(wheel_path),
+    ]
+
+
+def test_upgrade_wheel_uses_current_python_and_upgrade(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    wheel_path = tmp_path / "ohana_installer.whl"
+    wheel_path.write_bytes(b"wheel")
+    received_command: list[str] | None = None
+
+    def fake_run_command(
+        command: list[str],
+        *,
+        timeout: float,
+        error_message: str,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal received_command
+        received_command = command
+        assert timeout == 120.0
+        assert "mettre à niveau" in error_message
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    monkeypatch.setattr(
+        "ohana_installer.python_package._run_command",
+        fake_run_command,
+    )
+
+    upgrade_wheel(
+        wheel_path,
+        python_executable="/opt/ohana-installer/bin/python",
+    )
+
+    assert received_command == [
+        "/opt/ohana-installer/bin/python",
+        "-m",
+        "pip",
+        "install",
+        "--disable-pip-version-check",
+        "--upgrade",
         str(wheel_path),
     ]
 

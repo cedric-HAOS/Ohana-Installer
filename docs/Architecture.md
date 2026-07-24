@@ -45,6 +45,7 @@ Ohana-Installer est responsable de :
 * installer les composants ;
 * générer les fichiers de configuration ;
 * créer les services système ;
+* mettre à jour sa propre version dans l'environnement virtuel courant ;
 * mettre à jour les composants installés ;
 * désinstaller proprement la plateforme.
 
@@ -99,6 +100,12 @@ manifeste. L'asset correspondant est ensuite résolu dans la release GitHub épi
 puis sa taille et son digest SHA-256 sont vérifiés avant toute écriture sur disque.
 
 ```text
+Dernière release Installer
+             │
+             ▼
+Mise à niveau et reprise de la commande
+             │
+             ▼
 Dernière release Platform
              │
              ▼
@@ -201,7 +208,7 @@ Les évolutions envisagées comprennent notamment :
 * installation sélective des composants ;
 * sauvegarde et restauration ;
 * diagnostic de la plateforme ;
-* mise à jour automatique ;
+* mise à jour automatique planifiée ;
 * support de nouveaux environnements de déploiement.
 
 Ces évolutions devront préserver les principes suivants :

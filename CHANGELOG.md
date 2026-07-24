@@ -19,18 +19,24 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
   dnsmasq après validation par Agent.
 * Migration automatique de l'ancien fichier `00-ohanna.conf` vers
   `00-ohana.conf`.
+* Vérification de la dernière release stable d'Ohana-Installer au début de
+  `ohana update`.
+* Mise à niveau de l'Installer dans son environnement virtuel courant avec
+  reprise automatique de la commande avant la mise à jour d'Agent et Vision.
 
 ## Corrigé
 
 * `ohana update` ne télécharge, n'arrête et ne réinstalle plus un composant
   lorsque sa version correspond déjà à la version cible du manifeste Platform.
 * Le plan de mise à jour indique explicitement les composants conservés.
+* Les erreurs HTTP GitHub transitoires, notamment `502`, `503` et `504`, sont
+  retentées avant d'abandonner le téléchargement.
 
 ## Validation
 
 * Manifeste aligné sur Ohana-Platform 1.0.3, Ohana-Agent 1.2.0 et
   Ohana-Vision 1.2.0.
-* 187 tests réussis.
+* 195 tests réussis.
 
 ---
 

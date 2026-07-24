@@ -141,6 +141,34 @@ def install_wheel(
     )
 
 
+def upgrade_wheel(
+    wheel_path: Path | str,
+    *,
+    python_executable: Path | str = sys.executable,
+    timeout: float = DEFAULT_COMMAND_TIMEOUT,
+) -> None:
+    """Mettre à niveau un package dans l'environnement Python courant."""
+
+    package_path = Path(wheel_path)
+
+    if not package_path.is_file():
+        raise PackageInstallationError(f"Le wheel est introuvable : {package_path}.")
+
+    _run_command(
+        [
+            str(python_executable),
+            "-m",
+            "pip",
+            "install",
+            "--disable-pip-version-check",
+            "--upgrade",
+            str(package_path),
+        ],
+        timeout=timeout,
+        error_message=f"Impossible de mettre à niveau le wheel {package_path.name}",
+    )
+
+
 def verify_component_command(
     *,
     environment_path: Path | str,

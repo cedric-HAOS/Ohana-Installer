@@ -162,8 +162,13 @@ hostname -I
 sudo ohana update
 ```
 
-La commande détecte la dernière release stable d'Ohana-Platform, compare les
-versions installées, affiche le plan de mise à jour et demande confirmation.
+La commande vérifie d'abord la dernière release stable d'Ohana-Installer. Si
+une version plus récente existe, elle remplace le package dans
+`/opt/ohana-installer`, contrôle la nouvelle version puis reprend automatiquement
+la commande. Elle détecte ensuite la dernière release stable d'Ohana-Platform,
+compare les versions installées, affiche le plan de mise à jour et demande
+confirmation.
+
 Chaque composant déjà à la version cible est conservé sans téléchargement,
 arrêt ni réinstallation. La commande ne modifie rien si tous les composants sont
 déjà à jour et refuse les rétrogradations automatiques.
@@ -174,8 +179,10 @@ L'option `--yes` est disponible pour une automatisation volontaire :
 sudo ohana update --yes
 ```
 
-Cette commande met à jour Ohana-Agent et Ohana-Vision. Une nouvelle version
-d'Ohana-Installer doit être téléchargée et installée séparément.
+La transition depuis Ohana-Installer 1.0.0 vers 1.0.1 doit être réalisée une
+seule fois avec la procédure manuelle de ce guide, car la version 1.0.0 ne connaît
+pas encore ce mécanisme. À partir de la version 1.0.1, `ohana update` met également
+à jour l'Installer sans créer de seconde installation.
 
 ## Désinstallation
 

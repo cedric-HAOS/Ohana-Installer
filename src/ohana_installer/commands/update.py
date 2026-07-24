@@ -3,9 +3,12 @@
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 import tempfile
 from dataclasses import replace
 from pathlib import Path
+from typing import Literal, NoReturn
 
 from ohana_installer.administration import (
     AdministrationPreparationError,
@@ -39,7 +42,13 @@ from ohana_installer.commands.install import (
 )
 from ohana_installer.confirmation import confirm_action
 from ohana_installer.environment import run_environment_checks
-from ohana_installer.github import DownloadError
+from ohana_installer.github import (
+    DownloadError,
+    GitHubRelease,
+    GitHubReleaseAsset,
+    discover_latest_release,
+    download_release_asset,
+)
 from ohana_installer.manifest import (
     ComponentManifest,
     ManifestError,
@@ -49,6 +58,8 @@ from ohana_installer.python_package import (
     InstalledPythonComponent,
     PackageInstallationError,
     inspect_installed_component,
+    upgrade_wheel,
+    verify_component_command,
 )
 from ohana_installer.system_account import SystemAccountError
 from ohana_installer.systemd import (
@@ -60,8 +71,13 @@ from ohana_installer.systemd import (
     install_generated_services,
     stop_systemd_service,
 )
+from ohana_installer.version import __version__
 
 UPDATE_ERROR = 3
+INSTALLER_REPOSITORY = "cedric-HAOS/Ohana-Installer"
+INSTALLER_COMMAND_NAME = "ohana"
+INSTALLER_DISTRIBUTION_NAME = "ohana_installer"
+type InstallerUpdateResult = Literal["current", "updated", "declined"]
 
 COMPONENT_RUNTIMES = {
     AGENT_IDENTIFIER: (
@@ -201,6 +217,123 @@ def _numeric_version(version: str) -> tuple[int, int, int] | None:
     return tuple(int(part) for part in parts)
 
 
+def _release_version(release: GitHubRelease) -> str:
+    """Extraire une version SemVer simple depuis un tag de release."""
+
+    if not release.tag_name.startswith("v"):
+        raise DownloadError(
+            f"La release {release.repository} utilise un tag invalide : {release.tag_name}."
+        )
+
+    version = release.tag_name.removeprefix("v")
+
+    if _numeric_version(version) is None:
+        raise DownloadError(
+            f"La release {release.repository} utilise une version invalide : {release.tag_name}."
+        )
+
+    return version
+
+
+def _find_installer_wheel(
+    release: GitHubRelease,
+    version: str,
+) -> GitHubReleaseAsset:
+    """Trouver l'unique wheel de l'Installer dans une release."""
+
+    prefix = f"{INSTALLER_DISTRIBUTION_NAME}-{version}-"
+    matching_assets = tuple(
+        asset
+        for asset in release.assets
+        if asset.name.startswith(prefix) and asset.name.endswith(".whl")
+    )
+
+    if len(matching_assets) != 1:
+        raise DownloadError(
+            f"La release {release.repository}@{release.tag_name} doit "
+            f"contenir exactement un wheel {prefix}*.whl."
+        )
+
+    return matching_assets[0]
+
+
+def _prepare_installer_update(
+    temporary_path: Path,
+    *,
+    assume_yes: bool,
+) -> InstallerUpdateResult:
+    """Mettre à niveau l'Installer dans son environnement courant."""
+
+    print("Vérification d'Ohana-Installer...")
+
+    release = discover_latest_release(INSTALLER_REPOSITORY)
+    target_version = _release_version(release)
+    installed_version = _numeric_version(__version__)
+    available_version = _numeric_version(target_version)
+
+    if installed_version is None or available_version is None:
+        raise DownloadError(
+            "Impossible de comparer la version installée "
+            f"{__version__} à la release {release.tag_name}."
+        )
+
+    print(f"  Version installée : {__version__}")
+    print(f"  Dernière version  : {target_version}")
+
+    if available_version <= installed_version:
+        print("✓ Ohana-Installer est déjà à jour.")
+        return "current"
+
+    print()
+
+    if not confirm_action(
+        "Mettre à jour Ohana-Installer avant de poursuivre ?",
+        assume_yes=assume_yes,
+    ):
+        print("Mise à jour annulée.")
+        return "declined"
+
+    asset = _find_installer_wheel(release, target_version)
+    wheel_path = download_release_asset(
+        asset,
+        temporary_path / asset.name,
+    )
+
+    print(f"✓ Ohana-Installer {target_version} téléchargé et vérifié.")
+
+    upgrade_wheel(
+        wheel_path,
+        python_executable=sys.executable,
+    )
+
+    installed_component = verify_component_command(
+        environment_path=Path(sys.prefix),
+        command_name=INSTALLER_COMMAND_NAME,
+        expected_version=target_version,
+        component_name="Ohana-Installer",
+    )
+
+    print(f"✓ Ohana-Installer {installed_component.version} mis à jour.")
+    return "updated"
+
+
+def _restart_update(*, assume_yes: bool) -> NoReturn:
+    """Reprendre la commande avec la nouvelle version de l'Installer."""
+
+    arguments = [
+        sys.executable,
+        "-m",
+        "ohana_installer",
+        "update",
+    ]
+
+    if assume_yes:
+        arguments.append("--yes")
+
+    print("Reprise de la mise à jour avec la nouvelle version...")
+    os.execv(sys.executable, arguments)
+
+
 def _reject_downgrades(
     manifest: PlatformManifest,
     installed_components: dict[
@@ -253,9 +386,25 @@ def run(args: argparse.Namespace) -> int:
 
     print("L'environnement est compatible avec Ohana-Installer.")
     print()
-    print("Téléchargement du manifeste officiel...")
 
     try:
+        with tempfile.TemporaryDirectory(
+            prefix="ohana-installer-self-update-",
+        ) as installer_temporary_directory:
+            installer_update = _prepare_installer_update(
+                Path(installer_temporary_directory),
+                assume_yes=assume_yes,
+            )
+
+        if installer_update == "declined":
+            return 0
+
+        if installer_update == "updated":
+            _restart_update(assume_yes=assume_yes)
+
+        print()
+        print("Téléchargement du manifeste officiel...")
+
         with tempfile.TemporaryDirectory(
             prefix="ohana-installer-update-",
         ) as temporary_directory:

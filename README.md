@@ -81,7 +81,12 @@ La commande :
 ohana update
 ```
 
-interroge l'API GitHub pour découvrir la dernière release stable
+commence par vérifier la dernière release stable d'Ohana-Installer. Si une
+version plus récente existe, son wheel officiel est téléchargé, vérifié puis
+installé avec `pip --upgrade` dans le même environnement virtuel. La commande se
+relance ensuite automatiquement avec la nouvelle version.
+
+Une fois l'Installer à jour, la commande découvre la dernière release stable
 d'Ohana-Platform. Son manifeste détermine les releases exactes d'Ohana-Agent et
 d'Ohana-Vision à installer.
 
@@ -131,6 +136,7 @@ Le manifeste Platform, les wheels et les fichiers de configuration sont téléch
 exclusivement depuis les assets des releases GitHub officielles. Chaque contenu est
 comparé au digest SHA-256 publié par GitHub, ainsi qu'à sa taille déclarée, avant
 d'être écrit sur disque. Un asset sans digest ou dont le contenu diffère est rejeté.
+Les erreurs HTTP GitHub transitoires sont retentées automatiquement trois fois.
 
 ---
 

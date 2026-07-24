@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from dataclasses import replace
 from pathlib import Path
 
@@ -9,8 +10,14 @@ import pytest
 
 from ohana_installer.administration import AdministrationPreparation
 from ohana_installer.cli import main
+from ohana_installer.commands import update as update_command
 from ohana_installer.environment import EnvironmentCheck
-from ohana_installer.github import DownloadedComponent
+from ohana_installer.github import (
+    DownloadedComponent,
+    DownloadError,
+    GitHubRelease,
+    GitHubReleaseAsset,
+)
 from ohana_installer.manifest import (
     CompatibilityManifest,
     ComponentManifest,
@@ -26,6 +33,20 @@ from ohana_installer.systemd import (
     SystemdCommandError,
     SystemdServiceStatus,
 )
+from ohana_installer.version import __version__
+
+_prepare_installer_update = update_command._prepare_installer_update
+
+
+@pytest.fixture(autouse=True)
+def _skip_installer_self_update(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        update_command,
+        "_prepare_installer_update",
+        lambda temporary_path, *, assume_yes: "current",
+    )
 
 
 @pytest.fixture(autouse=True)
@@ -140,6 +161,196 @@ def _build_installed_component(
         version=version,
         environment_path=Path(f"/opt/ohana-{identifier}/venv"),
         executable_path=Path(f"/opt/ohana-{identifier}/venv/bin/{command_name}"),
+    )
+
+
+def _installer_release(
+    version: str,
+    *,
+    include_wheel: bool = True,
+) -> GitHubRelease:
+    assets: tuple[GitHubReleaseAsset, ...] = ()
+
+    if include_wheel:
+        assets = (
+            GitHubReleaseAsset(
+                name=f"ohana_installer-{version}-py3-none-any.whl",
+                download_url="https://example.invalid/installer.whl",
+                sha256="a" * 64,
+                size=5,
+            ),
+        )
+
+    return GitHubRelease(
+        repository="cedric-HAOS/Ohana-Installer",
+        tag_name=f"v{version}",
+        assets=assets,
+    )
+
+
+def test_installer_self_update_stops_when_current(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    monkeypatch.setattr(
+        update_command,
+        "discover_latest_release",
+        lambda repository: _installer_release(__version__),
+    )
+
+    result = _prepare_installer_update(
+        tmp_path,
+        assume_yes=False,
+    )
+
+    assert result == "current"
+    assert "déjà à jour" in capsys.readouterr().out
+
+
+def test_installer_self_update_downloads_upgrades_and_verifies(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    release = _installer_release("1.0.2")
+    operations: list[str] = []
+
+    monkeypatch.setattr(
+        update_command,
+        "discover_latest_release",
+        lambda repository: release,
+    )
+    monkeypatch.setattr(
+        update_command,
+        "confirm_action",
+        lambda message, *, assume_yes: assume_yes,
+    )
+
+    def download_asset(asset, destination):
+        operations.append(f"download:{asset.name}")
+        destination.write_bytes(b"wheel")
+        return destination
+
+    monkeypatch.setattr(
+        update_command,
+        "download_release_asset",
+        download_asset,
+    )
+    monkeypatch.setattr(
+        update_command,
+        "upgrade_wheel",
+        lambda wheel_path, *, python_executable: operations.append(
+            f"upgrade:{wheel_path.name}:{python_executable}"
+        ),
+    )
+    monkeypatch.setattr(
+        update_command,
+        "verify_component_command",
+        lambda **kwargs: InstalledPythonComponent(
+            name="Ohana-Installer",
+            version="1.0.2",
+            environment_path=Path(sys.prefix),
+            executable_path=Path(sys.prefix) / "bin" / "ohana",
+        ),
+    )
+
+    result = _prepare_installer_update(
+        tmp_path,
+        assume_yes=True,
+    )
+
+    assert result == "updated"
+    assert operations == [
+        "download:ohana_installer-1.0.2-py3-none-any.whl",
+        (f"upgrade:ohana_installer-1.0.2-py3-none-any.whl:{sys.executable}"),
+    ]
+    output = capsys.readouterr().out
+    assert "1.0.2 téléchargé et vérifié" in output
+    assert "1.0.2 mis à jour" in output
+
+
+def test_installer_self_update_can_be_declined(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        update_command,
+        "discover_latest_release",
+        lambda repository: _installer_release("1.0.2"),
+    )
+    monkeypatch.setattr(
+        update_command,
+        "confirm_action",
+        lambda message, *, assume_yes: False,
+    )
+    monkeypatch.setattr(
+        update_command,
+        "download_release_asset",
+        lambda *args, **kwargs: pytest.fail("Le wheel ne doit pas être téléchargé."),
+    )
+
+    assert (
+        _prepare_installer_update(
+            tmp_path,
+            assume_yes=False,
+        )
+        == "declined"
+    )
+
+
+def test_installer_self_update_requires_one_wheel(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        update_command,
+        "discover_latest_release",
+        lambda repository: _installer_release(
+            "1.0.2",
+            include_wheel=False,
+        ),
+    )
+    monkeypatch.setattr(
+        update_command,
+        "confirm_action",
+        lambda message, *, assume_yes: True,
+    )
+
+    with pytest.raises(DownloadError, match="exactement un wheel"):
+        _prepare_installer_update(
+            tmp_path,
+            assume_yes=True,
+        )
+
+
+def test_restart_update_reexecutes_current_python(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    received: tuple[str, list[str]] | None = None
+
+    class RestartCalled(RuntimeError):
+        pass
+
+    def fake_execv(executable: str, arguments: list[str]) -> None:
+        nonlocal received
+        received = (executable, arguments)
+        raise RestartCalled
+
+    monkeypatch.setattr(update_command.os, "execv", fake_execv)
+
+    with pytest.raises(RestartCalled):
+        update_command._restart_update(assume_yes=True)
+
+    assert received == (
+        sys.executable,
+        [
+            sys.executable,
+            "-m",
+            "ohana_installer",
+            "update",
+            "--yes",
+        ],
     )
 
 

@@ -414,6 +414,83 @@ def test_download_file_normalizes_network_errors(
         )
 
 
+def test_download_file_retries_transient_http_errors(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    content = b"content"
+    attempts = 0
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+
+        if attempts < 3:
+            raise urllib.error.HTTPError(
+                url=request.full_url,
+                code=504,
+                msg="Gateway Timeout",
+                hdrs=None,
+                fp=None,
+            )
+
+        return _response(content)
+
+    monkeypatch.setattr(
+        "ohana_installer.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    monkeypatch.setattr(
+        "ohana_installer.github.time.sleep",
+        lambda delay: None,
+    )
+
+    destination = download_file(
+        "https://example.invalid/artifact.txt",
+        tmp_path / "artifact.txt",
+        expected_sha256=_sha256(content),
+    )
+
+    assert attempts == 3
+    assert destination.read_bytes() == content
+
+
+def test_download_file_stops_after_transient_http_retries(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    attempts = 0
+
+    def fake_urlopen(request, timeout):
+        nonlocal attempts
+        attempts += 1
+        raise urllib.error.HTTPError(
+            url=request.full_url,
+            code=504,
+            msg="Gateway Timeout",
+            hdrs=None,
+            fp=None,
+        )
+
+    monkeypatch.setattr(
+        "ohana_installer.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    monkeypatch.setattr(
+        "ohana_installer.github.time.sleep",
+        lambda delay: None,
+    )
+
+    with pytest.raises(DownloadError, match="statut HTTP 504"):
+        download_file(
+            "https://example.invalid/artifact.txt",
+            tmp_path / "artifact.txt",
+            expected_sha256=_sha256(b"content"),
+        )
+
+    assert attempts == 3
+
+
 def test_download_platform_manifest_discovers_latest_and_verifies(
     tmp_path: Path,
     monkeypatch,

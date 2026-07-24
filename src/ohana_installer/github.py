@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -28,6 +29,9 @@ DEFAULT_TIMEOUT = 15.0
 GITHUB_API_ROOT = "https://api.github.com"
 GITHUB_API_VERSION = "2022-11-28"
 SHA256_HEX_LENGTH = 64
+DEFAULT_RETRY_ATTEMPTS = 3
+DEFAULT_RETRY_DELAY = 1.0
+RETRYABLE_HTTP_STATUS_CODES = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class DownloadError(RuntimeError):
@@ -116,24 +120,33 @@ def _read_response(
     accept: str,
     timeout: float,
 ) -> bytes:
-    """Lire une réponse GitHub et normaliser les erreurs réseau."""
+    """Lire une réponse GitHub et retenter les erreurs transitoires."""
 
     request = _github_request(url, accept=accept)
 
-    try:
-        with urllib.request.urlopen(
-            request,
-            timeout=timeout,
-        ) as response:
-            return response.read()
-    except urllib.error.HTTPError as error:
-        raise DownloadError(
-            f"La requête GitHub a échoué avec le statut HTTP {error.code} : {url}"
-        ) from error
-    except urllib.error.URLError as error:
-        raise DownloadError(f"La requête GitHub a échoué : {error.reason}") from error
-    except (TimeoutError, OSError) as error:
-        raise DownloadError(f"La requête GitHub a échoué : {error}") from error
+    for attempt in range(1, DEFAULT_RETRY_ATTEMPTS + 1):
+        try:
+            with urllib.request.urlopen(
+                request,
+                timeout=timeout,
+            ) as response:
+                return response.read()
+        except urllib.error.HTTPError as error:
+            retryable = error.code in RETRYABLE_HTTP_STATUS_CODES
+            last_attempt = attempt == DEFAULT_RETRY_ATTEMPTS
+
+            if not retryable or last_attempt:
+                raise DownloadError(
+                    f"La requête GitHub a échoué avec le statut HTTP {error.code} : {url}"
+                ) from error
+
+            time.sleep(DEFAULT_RETRY_DELAY * attempt)
+        except urllib.error.URLError as error:
+            raise DownloadError(f"La requête GitHub a échoué : {error.reason}") from error
+        except (TimeoutError, OSError) as error:
+            raise DownloadError(f"La requête GitHub a échoué : {error}") from error
+
+    raise DownloadError(f"La requête GitHub a échoué après plusieurs tentatives : {url}")
 
 
 def _read_json_object(
