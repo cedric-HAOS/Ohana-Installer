@@ -598,5 +598,7 @@ def _validate_service_name(service_name: str) -> None:
     if not service_name or Path(service_name).name != service_name:
         raise SystemdCommandError(f"Nom de service systemd invalide : {service_name!r}.")
 
-    if not service_name.endswith(".service"):
-        raise SystemdCommandError(f"Le nom {service_name!r} doit se terminer par '.service'.")
+    if not service_name.endswith((".service", ".path")):
+        raise SystemdCommandError(
+            f"Le nom {service_name!r} doit se terminer par '.service' ou '.path'."
+        )

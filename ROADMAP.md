@@ -181,9 +181,20 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.0.2
+
+## 11. Activation des unités systemd de surveillance
+
+* [x] Accepter les unités `.path` dans les commandes systemd génériques.
+* [x] Activer et démarrer `ohana-dhcp-reload.path` pendant une mise à jour.
+* [x] Conserver la validation stricte des noms d’unités systemd.
+* [x] 197 tests réussis.
+
+---
+
 # Évolutions futures
 
-Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.1 :
+Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.2 :
 
 * Sauvegarde et restauration.
 * Retour arrière (rollback).

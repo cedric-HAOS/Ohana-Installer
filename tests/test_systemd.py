@@ -78,6 +78,39 @@ def test_enable_systemd_service_runs_expected_command(
     ]
 
 
+def test_enable_systemd_service_accepts_path_unit(
+    monkeypatch,
+) -> None:
+    received_command: list[str] | None = None
+
+    def fake_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal received_command
+        del kwargs
+        received_command = command
+        return subprocess.CompletedProcess(
+            command,
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "ohana_installer.systemd.subprocess.run",
+        fake_run,
+    )
+
+    enable_systemd_service("ohana-dhcp-reload.path")
+
+    assert received_command == [
+        "systemctl",
+        "enable",
+        "ohana-dhcp-reload.path",
+    ]
+
+
 def test_enable_systemd_service_rejects_invalid_name() -> None:
     with pytest.raises(
         SystemdCommandError,
@@ -89,7 +122,7 @@ def test_enable_systemd_service_rejects_invalid_name() -> None:
 def test_enable_systemd_service_requires_service_suffix() -> None:
     with pytest.raises(
         SystemdCommandError,
-        match=r"doit se terminer par '\.service'",
+        match=r"doit se terminer par '\.service' ou '\.path'",
     ):
         enable_systemd_service("ohana-agent")
 
@@ -717,6 +750,39 @@ def test_start_systemd_service_runs_expected_command(
     ]
 
 
+def test_start_systemd_service_accepts_path_unit(
+    monkeypatch,
+) -> None:
+    received_command: list[str] | None = None
+
+    def fake_run(
+        command: list[str],
+        **kwargs: object,
+    ) -> subprocess.CompletedProcess[str]:
+        nonlocal received_command
+        del kwargs
+        received_command = command
+        return subprocess.CompletedProcess(
+            command,
+            returncode=0,
+            stdout="",
+            stderr="",
+        )
+
+    monkeypatch.setattr(
+        "ohana_installer.systemd.subprocess.run",
+        fake_run,
+    )
+
+    start_systemd_service("ohana-dhcp-reload.path")
+
+    assert received_command == [
+        "systemctl",
+        "start",
+        "ohana-dhcp-reload.path",
+    ]
+
+
 def test_start_systemd_service_rejects_invalid_name() -> None:
     with pytest.raises(
         SystemdCommandError,
@@ -728,7 +794,7 @@ def test_start_systemd_service_rejects_invalid_name() -> None:
 def test_start_systemd_service_requires_service_suffix() -> None:
     with pytest.raises(
         SystemdCommandError,
-        match=r"doit se terminer par '\.service'",
+        match=r"doit se terminer par '\.service' ou '\.path'",
     ):
         start_systemd_service("ohana-agent")
 
@@ -922,7 +988,7 @@ def test_get_systemd_service_status_rejects_invalid_name() -> None:
 def test_get_systemd_service_status_requires_service_suffix() -> None:
     with pytest.raises(
         SystemdCommandError,
-        match=r"doit se terminer par '\.service'",
+        match=r"doit se terminer par '\.service' ou '\.path'",
     ):
         get_systemd_service_status("ohana-agent")
 

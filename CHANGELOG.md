@@ -6,6 +6,23 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.2] - 2026-07-24
+
+## Corrigé
+
+* Les unités systemd de type `.path` peuvent désormais être activées et
+  démarrées par le flux d'administration DHCP.
+* La mise à jour ne s’interrompt plus lors de l’activation de
+  `ohana-dhcp-reload.path`.
+
+## Validation
+
+* Compatibilité conservée avec Ohana-Platform 1.0.3, Ohana-Agent 1.2.0
+  et Ohana-Vision 1.2.0.
+* 197 tests réussis.
+
+---
+
 # [1.0.1] - 2026-07-24
 
 ## Ajouté
