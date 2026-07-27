@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -158,6 +159,15 @@ def test_cli_displays_version(
 
     assert exc_info.value.code == 0
     assert capsys.readouterr().out.strip() == f"ohana {__version__}"
+
+
+def test_project_version_matches_public_version() -> None:
+    repository_root = Path(__file__).resolve().parents[1]
+
+    with (repository_root / "pyproject.toml").open("rb") as project_file:
+        project = tomllib.load(project_file)
+
+    assert project["project"]["version"] == __version__
 
 
 def test_cli_displays_help(

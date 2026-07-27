@@ -216,9 +216,27 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.0.4
+
+## 15. Présence réseau et DHCP
+
+* [x] Déployer `network.example.yaml` vers `plugins/network.yaml`.
+* [x] Déployer `dhcp.example.yaml` vers `plugins/dhcp.yaml`.
+* [x] Transmettre `--network-config` et `--dhcp-config` au service Agent.
+
+## 16. Composition validée
+
+* [x] Ohana-Platform 1.0.7.
+* [x] Ohana-Agent 1.5.0.
+* [x] Ohana-Vision 1.4.0.
+* [x] Version publique `ohana 1.0.4`.
+* [x] 199 tests réussis.
+
+---
+
 # Évolutions futures
 
-Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.3 :
+Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.4 :
 
 * Sauvegarde et restauration.
 * Retour arrière (rollback).

@@ -6,6 +6,30 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.4] - 2026-07-27
+
+## Ajouté
+
+* Déploiement de la configuration du plugin de présence réseau d'Ohana-Agent.
+* Déploiement de la configuration du plugin DHCP d'Ohana-Agent.
+* Ajout des arguments `--network-config` et `--dhcp-config` à l'unité
+  systemd d'Ohana-Agent.
+
+## Modifié
+
+* Manifest aligné sur Ohana-Platform 1.0.7, Ohana-Agent 1.5.0 et
+  Ohana-Vision 1.4.0.
+* Version publique de la commande `ohana` alignée sur la version du package.
+* Tests d'auto-mise à jour préparés pour une future version 1.0.5.
+
+## Validation
+
+* Vérification des sept configurations Agent déployées par le manifeste.
+* Vérification de la ligne de commande systemd complète d'Ohana-Agent.
+* 199 tests réussis.
+
+---
+
 # [1.0.3] - 2026-07-27
 
 ## Ajouté

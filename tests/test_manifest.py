@@ -364,9 +364,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.4.0"
-    assert agent.release_tag == "v1.4.0"
-    assert agent.package.filename == ("ohana_agent-1.4.0-py3-none-any.whl")
+    assert agent.version == "1.5.0"
+    assert agent.release_tag == "v1.5.0"
+    assert agent.package.filename == ("ohana_agent-1.5.0-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
@@ -381,6 +381,7 @@ def test_repository_manifest_is_valid() -> None:
         ("ntp.example.yaml", "plugins/ntp.yaml"),
         ("mqtt.example.yaml", "plugins/mqtt.yaml"),
         ("network.example.yaml", "plugins/network.yaml"),
+        ("dhcp.example.yaml", "plugins/dhcp.yaml"),
     )
     assert agent.service.arguments == (
         "--config",
@@ -395,6 +396,8 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/mqtt.yaml",
         "--network-config",
         "/etc/ohana-agent/plugins/network.yaml",
+        "--dhcp-config",
+        "/etc/ohana-agent/plugins/dhcp.yaml",
     )
 
     assert vision.version == "1.4.0"

@@ -176,9 +176,9 @@ Validation finale
 
 Chaque étape est validée avant de poursuivre afin de garantir une installation cohérente.
 
-La composition Platform 1.0.6 déclare les configurations DNS, NTP et MQTT
-attendues par Ohana-Agent 1.3.0. Le même manifest fournit les arguments de
-commande utilisés pour générer son unité systemd.
+La composition Platform 1.0.7 déclare les configurations DNS, NTP, MQTT,
+présence réseau et DHCP attendues par Ohana-Agent 1.5.0. Le même manifest
+fournit les arguments de commande utilisés pour générer son unité systemd.
 
 Pendant une mise à jour, la comparaison des versions décide uniquement quels
 packages Python doivent être remplacés. Les configurations et les unités systemd
@@ -202,7 +202,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.0.3 cible les systèmes Linux utilisant **systemd**.
+La version 1.0.4 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 
