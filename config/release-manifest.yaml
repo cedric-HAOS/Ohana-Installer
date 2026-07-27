@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.6"
+  version: "1.0.7"
 
 runtime:
   python:
@@ -12,12 +12,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.3.0"
-    release_tag: v1.3.0
+    version: "1.4.0"
+    release_tag: v1.4.0
 
     package:
       type: wheel
-      filename: ohana_agent-1.3.0-py3-none-any.whl
+      filename: ohana_agent-1.4.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent
@@ -37,6 +37,9 @@ components:
         - source: mqtt.example.yaml
           destination: plugins/mqtt.yaml
 
+        - source: network.example.yaml
+          destination: plugins/network.yaml
+
     service:
       filename: ohana-agent.service
       description: Ohana Agent
@@ -55,16 +58,18 @@ components:
         - /etc/ohana-agent/plugins/ntp.yaml
         - --mqtt-config
         - /etc/ohana-agent/plugins/mqtt.yaml
+        - --network-config
+        - /etc/ohana-agent/plugins/network.yaml
 
   vision:
     name: Ohana-Vision
     repository: cedric-HAOS/Ohana-Vision
-    version: "1.3.0"
-    release_tag: v1.3.0
+    version: "1.4.0"
+    release_tag: v1.4.0
 
     package:
       type: wheel
-      filename: ohana_vision-1.3.0-py3-none-any.whl
+      filename: ohana_vision-1.4.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-vision
