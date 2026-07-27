@@ -213,7 +213,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    release = _installer_release("1.0.3")
+    release = _installer_release("1.0.4")
     operations: list[str] = []
 
     monkeypatch.setattr(
@@ -249,7 +249,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
         "verify_component_command",
         lambda **kwargs: InstalledPythonComponent(
             name="Ohana-Installer",
-            version="1.0.3",
+            version="1.0.4",
             environment_path=Path(sys.prefix),
             executable_path=Path(sys.prefix) / "bin" / "ohana",
         ),
@@ -262,12 +262,12 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
 
     assert result == "updated"
     assert operations == [
-        "download:ohana_installer-1.0.3-py3-none-any.whl",
-        (f"upgrade:ohana_installer-1.0.3-py3-none-any.whl:{sys.executable}"),
+        "download:ohana_installer-1.0.4-py3-none-any.whl",
+        (f"upgrade:ohana_installer-1.0.4-py3-none-any.whl:{sys.executable}"),
     ]
     output = capsys.readouterr().out
-    assert "1.0.3 téléchargé et vérifié" in output
-    assert "1.0.3 mis à jour" in output
+    assert "1.0.4 téléchargé et vérifié" in output
+    assert "1.0.4 mis à jour" in output
 
 
 def test_installer_self_update_can_be_declined(
@@ -277,7 +277,7 @@ def test_installer_self_update_can_be_declined(
     monkeypatch.setattr(
         update_command,
         "discover_latest_release",
-        lambda repository: _installer_release("1.0.3"),
+        lambda repository: _installer_release("1.0.4"),
     )
     monkeypatch.setattr(
         update_command,
@@ -307,7 +307,7 @@ def test_installer_self_update_requires_one_wheel(
         update_command,
         "discover_latest_release",
         lambda repository: _installer_release(
-            "1.0.3",
+            "1.0.4",
             include_wheel=False,
         ),
     )
@@ -953,9 +953,7 @@ def test_update_reconciles_platform_when_installed_versions_are_current(
     )
     monkeypatch.setattr(
         "ohana_installer.commands.update._generate_services",
-        lambda selected_manifest, directory: (
-            operations.append("generate") or generated_services
-        ),
+        lambda selected_manifest, directory: operations.append("generate") or generated_services,
     )
     monkeypatch.setattr(
         "ohana_installer.commands.update._install_configurations",

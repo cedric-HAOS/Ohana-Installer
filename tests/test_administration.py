@@ -199,9 +199,7 @@ def test_prepare_administration_secures_plugin_configurations(
     secured_paths: list[tuple[Path, str, int]] = []
     monkeypatch.setattr(
         "ohana_installer.administration._secure_mutable_path",
-        lambda path, *, group_name, mode: secured_paths.append(
-            (path, group_name, mode)
-        ),
+        lambda path, *, group_name, mode: secured_paths.append((path, group_name, mode)),
     )
 
     prepare_administration(

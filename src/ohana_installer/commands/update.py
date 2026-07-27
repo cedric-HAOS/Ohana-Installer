@@ -681,10 +681,7 @@ def run(args: argparse.Namespace) -> int:
     print()
 
     if not updated_identifiers:
-        print(
-            "Composition Ohana Platform réconciliée ; "
-            "services redémarrés et vérifiés."
-        )
+        print("Composition Ohana Platform réconciliée ; services redémarrés et vérifiés.")
     elif updated_identifiers == {
         AGENT_IDENTIFIER,
         VISION_IDENTIFIER,

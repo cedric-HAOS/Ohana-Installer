@@ -6,6 +6,35 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.3] - 2026-07-27
+
+## Ajouté
+
+* Déploiement des configurations officielles des plugins DNS, NTP et MQTT.
+* Ajout des arguments `--ntp-config` et `--mqtt-config` à l'unité systemd
+  d'Ohana-Agent.
+
+## Modifié
+
+* Manifest aligné sur Ohana-Platform 1.0.6, Ohana-Agent 1.3.0 et
+  Ohana-Vision 1.3.0.
+* Les configurations de plugins sont préparées avec les droits nécessaires aux
+  écritures atomiques réalisées par Ohana-Agent.
+* `ohana update` réconcilie désormais les configurations et les unités systemd
+  même lorsque les packages Python sont déjà à la version cible.
+* Les packages déjà à jour restent conservés sans téléchargement ni
+  réinstallation.
+
+## Validation
+
+* Vérification du téléchargement des cinq configurations Agent depuis une même
+  release GitHub.
+* Vérification de l'installation des configurations DNS, NTP et MQTT.
+* Vérification de la ligne de commande systemd complète d'Ohana-Agent.
+* 198 tests réussis.
+
+---
+
 # [1.0.2] - 2026-07-24
 
 ## Corrigé

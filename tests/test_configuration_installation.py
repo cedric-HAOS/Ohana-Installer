@@ -25,10 +25,11 @@ from ohana_installer.manifest import (
 def _build_downloaded_configuration(
     tmp_path: Path,
     *,
+    source: str = "dns.example.yaml",
     destination: Path = Path("plugins/dns.yaml"),
     with_component_configuration: bool = True,
 ) -> DownloadedConfigurationFile:
-    source_path = tmp_path / "downloads" / "dns.example.yaml"
+    source_path = tmp_path / "downloads" / source
     source_path.parent.mkdir(parents=True)
     source_path.write_text("enabled: true\n", encoding="utf-8")
 
@@ -36,7 +37,7 @@ def _build_downloaded_configuration(
         directory=tmp_path / "etc" / "ohana-agent",
         files=(
             ConfigurationFile(
-                source="dns.example.yaml",
+                source=source,
                 destination=destination,
             ),
         ),
@@ -162,19 +163,24 @@ def test_install_configuration_file_requires_component_configuration(
 def test_install_configurations_installs_all_files(
     tmp_path: Path,
 ) -> None:
-    first = _build_downloaded_configuration(
-        tmp_path / "first",
-        destination=Path("first.yaml"),
-    )
-    second = _build_downloaded_configuration(
-        tmp_path / "second",
-        destination=Path("second.yaml"),
+    downloaded_files = tuple(
+        _build_downloaded_configuration(
+            tmp_path / plugin_name,
+            source=f"{plugin_name}.example.yaml",
+            destination=Path(f"plugins/{plugin_name}.yaml"),
+        )
+        for plugin_name in ("dns", "ntp", "mqtt")
     )
 
-    installed_files = _install_configurations((first, second))
+    installed_files = _install_configurations(downloaded_files)
 
-    assert len(installed_files) == 2
+    assert len(installed_files) == 3
     assert all(installed_file.created for installed_file in installed_files)
+    assert tuple(file.destination_path.name for file in installed_files) == (
+        "dns.yaml",
+        "ntp.yaml",
+        "mqtt.yaml",
+    )
 
 
 def test_install_configuration_file_secures_directories_and_file(

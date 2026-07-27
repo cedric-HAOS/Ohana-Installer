@@ -314,9 +314,7 @@ def _prepare_plugin_configuration_files(
             continue
 
         if not path.is_file() or path.is_symlink():
-            raise AdministrationPreparationError(
-                f"Configuration de plugin non régulière : {path}."
-            )
+            raise AdministrationPreparationError(f"Configuration de plugin non régulière : {path}.")
 
         if secure_ownership:
             _secure_mutable_path(

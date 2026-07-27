@@ -192,9 +192,33 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.0.3
+
+## 12. Plugins administrables
+
+* [x] Déployer les configurations DNS, NTP et MQTT depuis la release Agent.
+* [x] Transmettre les chemins des trois configurations au service systemd.
+* [x] Préparer les permissions nécessaires aux écritures d'Ohana-Agent.
+
+## 13. Réconciliation de la composition Platform
+
+* [x] Conserver les packages Python déjà à la version cible.
+* [x] Installer les nouvelles configurations sans écraser les fichiers locaux.
+* [x] Régénérer et remplacer les unités systemd devenues différentes.
+* [x] Redémarrer et vérifier les services après réconciliation.
+
+## 14. Composition validée
+
+* [x] Ohana-Platform 1.0.6.
+* [x] Ohana-Agent 1.3.0.
+* [x] Ohana-Vision 1.3.0.
+* [x] 198 tests réussis.
+
+---
+
 # Évolutions futures
 
-Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.2 :
+Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.3 :
 
 * Sauvegarde et restauration.
 * Retour arrière (rollback).

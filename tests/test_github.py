@@ -663,26 +663,26 @@ def test_download_component_configuration_files_uses_one_release(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    configuration_sources = (
+        "shikamaru.example.yaml",
+        "infrastructure.example.yaml",
+        "dns.example.yaml",
+        "ntp.example.yaml",
+        "mqtt.example.yaml",
+    )
     component = _build_component(
         configuration=ComponentConfiguration(
             directory=Path("/etc/ohana-agent"),
-            files=(
+            files=tuple(
                 ConfigurationFile(
-                    source="shikamaru.yaml",
-                    destination=Path("shikamaru.yaml"),
-                ),
-                ConfigurationFile(
-                    source="dns.yaml",
-                    destination=Path("plugins/dns.yaml"),
-                ),
+                    source=source,
+                    destination=Path(source.removesuffix(".example.yaml") + ".yaml"),
+                )
+                for source in configuration_sources
             ),
         )
     )
-    assets = (
-        _release_asset("shikamaru.yaml"),
-        _release_asset("dns.yaml"),
-    )
-    release = _release(*assets)
+    release = _release(*(_release_asset(source) for source in configuration_sources))
     release_calls = 0
 
     def fake_get_release(repository, release_tag, *, timeout):
@@ -716,9 +716,10 @@ def test_download_component_configuration_files_uses_one_release(
     )
 
     assert release_calls == 1
-    assert len(results) == 2
+    assert len(results) == 5
     assert all(isinstance(result, DownloadedConfigurationFile) for result in results)
-    assert results[0].path == (tmp_path / "configuration" / "agent" / "shikamaru.yaml")
+    assert tuple(result.configuration_file.source for result in results) == configuration_sources
+    assert results[0].path == (tmp_path / "configuration" / "agent" / "shikamaru.example.yaml")
 
 
 def test_download_component_configuration_files_ignores_missing_configuration(

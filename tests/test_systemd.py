@@ -479,6 +479,14 @@ def _build_agent_service() -> ComponentService:
         arguments=(
             "--config",
             "/etc/ohana-agent/shikamaru.yaml",
+            "--infrastructure",
+            "/etc/ohana-agent/infrastructure.yaml",
+            "--dns-config",
+            "/etc/ohana-agent/plugins/dns.yaml",
+            "--ntp-config",
+            "/etc/ohana-agent/plugins/ntp.yaml",
+            "--mqtt-config",
+            "/etc/ohana-agent/plugins/mqtt.yaml",
         ),
     )
 
@@ -493,7 +501,12 @@ def test_render_systemd_service() -> None:
     assert "Group=ohana" in content
     assert "WorkingDirectory=/opt/ohana-agent" in content
     assert (
-        "ExecStart=/opt/ohana-agent/venv/bin/ohana-agent --config /etc/ohana-agent/shikamaru.yaml"
+        "ExecStart=/opt/ohana-agent/venv/bin/ohana-agent "
+        "--config /etc/ohana-agent/shikamaru.yaml "
+        "--infrastructure /etc/ohana-agent/infrastructure.yaml "
+        "--dns-config /etc/ohana-agent/plugins/dns.yaml "
+        "--ntp-config /etc/ohana-agent/plugins/ntp.yaml "
+        "--mqtt-config /etc/ohana-agent/plugins/mqtt.yaml"
     ) in content
     assert "Restart=on-failure" in content
     assert "NoNewPrivileges=true" in content

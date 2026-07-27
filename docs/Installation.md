@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.0.2**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.0.3**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée
@@ -47,15 +47,15 @@ sudo reboot
 ## 3. Télécharger la release officielle
 
 ```bash
-mkdir -p "$HOME/ohana-installer-1.0.2"
-cd "$HOME/ohana-installer-1.0.2"
+mkdir -p "$HOME/ohana-installer-1.0.3"
+cd "$HOME/ohana-installer-1.0.3"
 
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.2/ohana_installer-1.0.2-py3-none-any.whl
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.3/ohana_installer-1.0.3-py3-none-any.whl
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.2/ohana_installer-1.0.2.tar.gz
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.3/ohana_installer-1.0.3.tar.gz
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.2/SHA256SUMS
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.3/SHA256SUMS
 ```
 
 ## 4. Vérifier les artefacts
@@ -75,7 +75,7 @@ Raspberry Pi OS.
 ```bash
 sudo python3.13 -m venv /opt/ohana-installer
 sudo /opt/ohana-installer/bin/python -m pip install \
-  ./ohana_installer-1.0.2-py3-none-any.whl
+  ./ohana_installer-1.0.3-py3-none-any.whl
 sudo ln -sfn /opt/ohana-installer/bin/ohana /usr/local/bin/ohana
 ```
 
@@ -88,7 +88,7 @@ ohana --version
 Résultat attendu :
 
 ```text
-ohana 1.0.2
+ohana 1.0.3
 ```
 
 ## 6. Installer la plateforme Ohana
@@ -103,8 +103,9 @@ L'installateur :
 2. découvre la dernière release stable d'Ohana-Platform ;
 3. vérifie cryptographiquement le manifeste et tous les téléchargements ;
 4. affiche les versions d'Ohana-Agent et d'Ohana-Vision ;
-5. demande une confirmation avant de modifier le système ;
-6. installe et démarre les deux services systemd.
+5. télécharge les configurations Agent, dont DNS, NTP et MQTT ;
+6. demande une confirmation avant de modifier le système ;
+7. installe et démarre les deux services systemd.
 
 Répondre `oui` après avoir vérifié les versions affichées. Pour une installation
 automatisée, la confirmation peut être acceptée explicitement :
@@ -123,7 +124,8 @@ la configuration courante est accessible directement dans Vision :
 3. utiliser **Baux DHCP** pour la plage, les options, les réservations et les
    baux actifs ;
 4. utiliser **Architecture** pour les équipements, services et liaisons ;
-5. vérifier le récapitulatif puis confirmer l'application.
+5. utiliser **Plugins** pour administrer DNS, NTP et MQTT ;
+6. vérifier le récapitulatif puis confirmer l'application.
 
 Le navigateur ne lit et n'écrit aucun fichier YAML. Vision transmet les
 modifications à l'API locale authentifiée d'Agent. Celui-ci valide les documents,
@@ -169,9 +171,11 @@ la commande. Elle détecte ensuite la dernière release stable d'Ohana-Platform,
 compare les versions installées, affiche le plan de mise à jour et demande
 confirmation.
 
-Chaque composant déjà à la version cible est conservé sans téléchargement,
-arrêt ni réinstallation. La commande ne modifie rien si tous les composants sont
-déjà à jour et refuse les rétrogradations automatiques.
+Chaque package déjà à la version cible est conservé sans téléchargement ni
+réinstallation. La commande réconcilie néanmoins les fichiers de configuration
+manquants et les unités systemd avec le manifeste Platform, puis redémarre et
+vérifie les services. Les configurations locales existantes ne sont pas écrasées.
+Les rétrogradations automatiques restent refusées.
 
 L'option `--yes` est disponible pour une automatisation volontaire :
 

@@ -352,7 +352,7 @@ def test_repository_manifest_is_valid() -> None:
     manifest = load_manifest(manifest_path)
 
     assert manifest.platform_name == "Ohana"
-    assert manifest.platform_version == "1.0.5"
+    assert manifest.platform_version == "1.0.6"
     assert manifest.runtime.minimum_python_version == "3.13"
     assert {component.identifier for component in manifest.components} == {
         "agent",
@@ -371,10 +371,27 @@ def test_repository_manifest_is_valid() -> None:
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
     assert agent.service.group == "ohana-agent"
-    assert tuple(configuration_file.source for configuration_file in agent.configuration.files) == (
-        "shikamaru.example.yaml",
-        "infrastructure.example.yaml",
-        "dns.example.yaml",
+    assert tuple(
+        (configuration_file.source, configuration_file.destination.as_posix())
+        for configuration_file in agent.configuration.files
+    ) == (
+        ("shikamaru.example.yaml", "shikamaru.yaml"),
+        ("infrastructure.example.yaml", "infrastructure.yaml"),
+        ("dns.example.yaml", "plugins/dns.yaml"),
+        ("ntp.example.yaml", "plugins/ntp.yaml"),
+        ("mqtt.example.yaml", "plugins/mqtt.yaml"),
+    )
+    assert agent.service.arguments == (
+        "--config",
+        "/etc/ohana-agent/shikamaru.yaml",
+        "--infrastructure",
+        "/etc/ohana-agent/infrastructure.yaml",
+        "--dns-config",
+        "/etc/ohana-agent/plugins/dns.yaml",
+        "--ntp-config",
+        "/etc/ohana-agent/plugins/ntp.yaml",
+        "--mqtt-config",
+        "/etc/ohana-agent/plugins/mqtt.yaml",
     )
 
     assert vision.version == "1.3.0"
