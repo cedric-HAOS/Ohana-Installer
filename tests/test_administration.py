@@ -176,3 +176,56 @@ def test_activate_administration_starts_path_unit(
 
     assert enabled == [DHCP_RELOAD_PATH_NAME]
     assert started == [DHCP_RELOAD_PATH_NAME]
+
+
+def test_prepare_administration_secures_plugin_configurations(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    (
+        agent_configuration,
+        infrastructure,
+        vision_configuration,
+    ) = make_configuration_files(tmp_path)
+    plugins_directory = agent_configuration.parent / "plugins"
+    plugins_directory.mkdir()
+
+    for filename in ("dns.yaml", "ntp.yaml", "mqtt.yaml"):
+        (plugins_directory / filename).write_text(
+            "enabled: true\n",
+            encoding="utf-8",
+        )
+
+    secured_paths: list[tuple[Path, str, int]] = []
+    monkeypatch.setattr(
+        "ohana_installer.administration._secure_mutable_path",
+        lambda path, *, group_name, mode: secured_paths.append(
+            (path, group_name, mode)
+        ),
+    )
+
+    prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=(agent_configuration.parent / "management.token"),
+        vision_configuration_path=vision_configuration,
+        vision_token_path=(vision_configuration.parent / "management.token"),
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        systemd_directory=tmp_path / "systemd",
+        require_linux=False,
+        secure_ownership=True,
+    )
+
+    assert (
+        plugins_directory,
+        "ohana-agent",
+        0o770,
+    ) in secured_paths
+
+    for filename in ("dns.yaml", "ntp.yaml", "mqtt.yaml"):
+        assert (
+            plugins_directory / filename,
+            "ohana-agent",
+            0o660,
+        ) in secured_paths

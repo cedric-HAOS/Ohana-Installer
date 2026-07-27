@@ -364,9 +364,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.2.1"
-    assert agent.release_tag == "v1.2.1"
-    assert agent.package.filename == ("ohana_agent-1.2.1-py3-none-any.whl")
+    assert agent.version == "1.3.0"
+    assert agent.release_tag == "v1.3.0"
+    assert agent.package.filename == ("ohana_agent-1.3.0-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
@@ -377,9 +377,9 @@ def test_repository_manifest_is_valid() -> None:
         "dns.example.yaml",
     )
 
-    assert vision.version == "1.2.1"
-    assert vision.release_tag == "v1.2.1"
-    assert vision.package.filename == ("ohana_vision-1.2.1-py3-none-any.whl")
+    assert vision.version == "1.3.0"
+    assert vision.release_tag == "v1.3.0"
+    assert vision.package.filename == ("ohana_vision-1.3.0-py3-none-any.whl")
     assert vision.configuration is not None
     assert vision.service is not None
     assert vision.service.user == "ohana-vision"

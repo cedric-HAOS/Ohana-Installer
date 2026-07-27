@@ -650,6 +650,11 @@ def test_update_only_reinstalls_outdated_component(
             )
             or (
                 SystemdServiceStatus(
+                    service_name="ohana-agent.service",
+                    active=True,
+                    status="active",
+                ),
+                SystemdServiceStatus(
                     service_name="ohana-vision.service",
                     active=True,
                     status="active",
@@ -662,17 +667,17 @@ def test_update_only_reinstalls_outdated_component(
 
     assert operations == [
         "download:vision",
-        "download-config:vision",
-        "accounts:vision",
-        "generate:vision",
+        "download-config:agent,vision",
+        "accounts:agent,vision",
+        "generate:agent,vision",
         "config",
-        "stop:vision",
+        "stop:agent,vision",
         "vision:True",
-        "replace:vision",
+        "replace:agent,vision",
         "reload",
-        "enable:vision",
-        "start:vision",
-        "check:vision",
+        "enable:agent,vision",
+        "start:agent,vision",
+        "check:agent,vision",
     ]
 
     output = capsys.readouterr().out
@@ -897,11 +902,17 @@ def test_update_cancellation_prevents_component_downloads(
     assert "Mise à jour annulée" in capsys.readouterr().out
 
 
-def test_update_stops_when_installed_versions_are_current(
+def test_update_reconciles_platform_when_installed_versions_are_current(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     manifest = _build_manifest()
+    generated_services = _build_generated_services(
+        manifest,
+        Path("/tmp/systemd"),
+    )
+    installed_services = _build_installed_services(manifest)
+    operations: list[str] = []
 
     monkeypatch.setattr(
         "ohana_installer.commands.update.run_environment_checks",
@@ -926,12 +937,98 @@ def test_update_stops_when_installed_versions_are_current(
             executable_path=Path("/opt/ohana/venv/bin/ohana"),
         ),
     )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._download_components",
+        lambda manifest, directory: pytest.fail(
+            "Aucun wheel ne doit être téléchargé lorsque les versions sont à jour."
+        ),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._download_configurations",
+        lambda selected_manifest, directory: operations.append("download-config") or (),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._ensure_service_accounts",
+        lambda selected_manifest: operations.append("accounts") or (),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._generate_services",
+        lambda selected_manifest, directory: (
+            operations.append("generate") or generated_services
+        ),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._install_configurations",
+        lambda downloaded_files: operations.append("config") or (),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._stop_services",
+        lambda services: operations.append("stop"),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._install_agent",
+        lambda components, *, replace: pytest.fail("Ohana-Agent ne doit pas être réinstallé."),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._install_vision",
+        lambda components, *, replace: pytest.fail("Ohana-Vision ne doit pas être réinstallé."),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._replace_services",
+        lambda services: operations.append("replace") or installed_services,
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._reload_systemd",
+        lambda: operations.append("reload"),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._enable_services",
+        lambda services: operations.append("enable"),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._start_services",
+        lambda services: operations.append("start"),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._check_services",
+        lambda services: (
+            operations.append("check")
+            or (
+                SystemdServiceStatus(
+                    service_name="ohana-agent.service",
+                    active=True,
+                    status="active",
+                ),
+                SystemdServiceStatus(
+                    service_name="ohana-vision.service",
+                    active=True,
+                    status="active",
+                ),
+            )
+        ),
+    )
 
-    assert main(["update"]) == 0
+    assert main(["update", "--yes"]) == 0
+
+    assert operations == [
+        "download-config",
+        "accounts",
+        "generate",
+        "config",
+        "stop",
+        "replace",
+        "reload",
+        "enable",
+        "start",
+        "check",
+    ]
 
     output = capsys.readouterr().out
     assert "1.1.0 → 1.1.0" in output
     assert "utilisent déjà" in output
+    assert "Aucun package Python à télécharger" in output
+    assert "composition Platform va néanmoins être réconciliée" in output
+    assert "Composition Ohana Platform réconciliée" in output
 
 
 def test_update_refuses_automatic_downgrade(

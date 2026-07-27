@@ -425,16 +425,21 @@ def run(args: argparse.Namespace) -> int:
                 installed_components,
             )
 
-            if _versions_are_current(
+            versions_are_current = _versions_are_current(
                 manifest,
                 installed_components,
-            ):
+            )
+
+            if versions_are_current:
                 print()
                 print(
                     "Ohana-Agent et Ohana-Vision utilisent déjà "
                     "les versions de la dernière release Platform."
                 )
-                return 0
+                print(
+                    "La composition Platform va néanmoins être réconciliée "
+                    "(configurations et services systemd)."
+                )
 
             _reject_downgrades(
                 manifest,
@@ -463,20 +468,24 @@ def run(args: argparse.Namespace) -> int:
             print()
             print("Téléchargement des composants...")
 
-            downloaded_components = _download_components(
-                update_manifest,
-                temporary_path,
-            )
+            if components_to_update:
+                downloaded_components = _download_components(
+                    update_manifest,
+                    temporary_path,
+                )
 
-            for downloaded_component in downloaded_components:
-                component = downloaded_component.component
-                print(f"✓ {component.name} {component.version} téléchargé.")
+                for downloaded_component in downloaded_components:
+                    component = downloaded_component.component
+                    print(f"✓ {component.name} {component.version} téléchargé.")
+            else:
+                downloaded_components = ()
+                print("✓ Aucun package Python à télécharger.")
 
             print()
             print("Téléchargement des configurations...")
 
             downloaded_configurations = _download_configurations(
-                update_manifest,
+                manifest,
                 temporary_path,
             )
 
@@ -491,7 +500,7 @@ def run(args: argparse.Namespace) -> int:
             print()
             print("Vérification des comptes système...")
 
-            system_accounts = _ensure_service_accounts(update_manifest)
+            system_accounts = _ensure_service_accounts(manifest)
 
             for system_account in system_accounts:
                 print(f"✓ Groupe système {system_account.group_name} prêt.")
@@ -501,7 +510,7 @@ def run(args: argparse.Namespace) -> int:
             print("Génération des services systemd...")
 
             generated_services = _generate_services(
-                update_manifest,
+                manifest,
                 temporary_path,
             )
 
@@ -671,7 +680,12 @@ def run(args: argparse.Namespace) -> int:
 
     print()
 
-    if updated_identifiers == {
+    if not updated_identifiers:
+        print(
+            "Composition Ohana Platform réconciliée ; "
+            "services redémarrés et vérifiés."
+        )
+    elif updated_identifiers == {
         AGENT_IDENTIFIER,
         VISION_IDENTIFIER,
     }:

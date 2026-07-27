@@ -17,6 +17,11 @@ AGENT_CONFIGURATION_DIRECTORY = Path("/etc/ohana-agent")
 AGENT_CONFIGURATION_PATH = AGENT_CONFIGURATION_DIRECTORY / "shikamaru.yaml"
 AGENT_INFRASTRUCTURE_PATH = AGENT_CONFIGURATION_DIRECTORY / "infrastructure.yaml"
 AGENT_TOKEN_PATH = AGENT_CONFIGURATION_DIRECTORY / "management.token"
+AGENT_PLUGIN_CONFIGURATION_FILENAMES = (
+    "dns.yaml",
+    "ntp.yaml",
+    "mqtt.yaml",
+)
 
 VISION_CONFIGURATION_DIRECTORY = Path("/etc/ohana-vision")
 VISION_CONFIGURATION_PATH = VISION_CONFIGURATION_DIRECTORY / "vision.yaml"
@@ -130,6 +135,11 @@ def prepare_administration(
             group_name="ohana-agent",
             mode=0o660,
         )
+
+    _prepare_plugin_configuration_files(
+        agent_configuration_path.parent / "plugins",
+        secure_ownership=secure_ownership,
+    )
 
     installed_units: tuple[Path, ...] = ()
 
@@ -267,6 +277,53 @@ def _vision_agent_section(
             "",
         ]
     )
+
+
+def _prepare_plugin_configuration_files(
+    directory: Path,
+    *,
+    secure_ownership: bool,
+) -> None:
+    """Préparer les configurations de plugins modifiables par Agent."""
+    try:
+        directory.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+    except OSError as error:
+        raise AdministrationPreparationError(
+            f"Impossible de préparer le répertoire des plugins {directory} : {error}"
+        ) from error
+
+    if directory.is_symlink() or not directory.is_dir():
+        raise AdministrationPreparationError(
+            f"Le répertoire des plugins {directory} n'est pas un répertoire régulier."
+        )
+
+    if secure_ownership:
+        _secure_mutable_path(
+            directory,
+            group_name="ohana-agent",
+            mode=0o770,
+        )
+
+    for filename in AGENT_PLUGIN_CONFIGURATION_FILENAMES:
+        path = directory / filename
+
+        if not path.exists():
+            continue
+
+        if not path.is_file() or path.is_symlink():
+            raise AdministrationPreparationError(
+                f"Configuration de plugin non régulière : {path}."
+            )
+
+        if secure_ownership:
+            _secure_mutable_path(
+                path,
+                group_name="ohana-agent",
+                mode=0o660,
+            )
 
 
 def _prepare_dnsmasq_files(
