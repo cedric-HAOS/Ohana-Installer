@@ -12,12 +12,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.4.0"
-    release_tag: v1.4.0
+    version: "1.5.0"
+    release_tag: v1.5.0
 
     package:
       type: wheel
-      filename: ohana_agent-1.4.0-py3-none-any.whl
+      filename: ohana_agent-1.5.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent
@@ -40,6 +40,9 @@ components:
         - source: network.example.yaml
           destination: plugins/network.yaml
 
+        - source: dhcp.example.yaml
+          destination: plugins/dhcp.yaml
+
     service:
       filename: ohana-agent.service
       description: Ohana Agent
@@ -60,6 +63,8 @@ components:
         - /etc/ohana-agent/plugins/mqtt.yaml
         - --network-config
         - /etc/ohana-agent/plugins/network.yaml
+        - --dhcp-config
+        - /etc/ohana-agent/plugins/dhcp.yaml
 
   vision:
     name: Ohana-Vision
