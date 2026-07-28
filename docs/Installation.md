@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.0.4**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.0.5**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée

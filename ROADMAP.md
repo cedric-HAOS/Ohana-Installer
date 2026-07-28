@@ -232,6 +232,22 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 * [x] Version publique `ohana 1.0.4`.
 * [x] 199 tests réussis.
 
+# Version 1.0.5
+
+## 15. Présence réseau et DHCP
+
+* [x] Déployer `wireguard.example.yaml` vers `plugins/wireguard.yaml`.
+* [x] Déployer `shelly-telemetry.example.yaml` vers `plugins/shelly-telemetry.yaml`.
+* [x] Déployer `zwave.example.yaml` vers `plugins/zwave.yaml`.
+
+## 16. Composition validée
+
+* [x] Ohana-Platform 1.0.11.
+* [x] Ohana-Agent 1.7.1.
+* [x] Ohana-Vision 1.6.0.
+* [x] Version publique `ohana 1.0.5`.
+* [x] 199 tests réussis.
+
 ---
 
 # Évolutions futures

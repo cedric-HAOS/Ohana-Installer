@@ -12,12 +12,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.7.0"
-    release_tag: v1.7.0
+    version: "1.7.1"
+    release_tag: v1.7.1
 
     package:
       type: wheel
-      filename: ohana_agent-1.7.0-py3-none-any.whl
+      filename: ohana_agent-1.7.1-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent

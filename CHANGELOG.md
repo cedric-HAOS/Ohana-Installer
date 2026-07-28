@@ -6,6 +6,25 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.5] - 2026-07-28
+
+## Ajouté
+
+* Déploiement des configurations Z-Wave, WireGuard et Shelly Telemetry.
+* Ajout des arguments `--zwave-config`, `--wireguard-config` et
+  `--shelly-telemetry-config` au service systemd d'Ohana-Agent.
+
+## Modifié
+
+* Manifest aligné sur Ohana-Platform 1.0.11.
+* Ohana-Agent aligné sur 1.7.1.
+* Ohana-Vision aligné sur 1.6.0.
+* Tests d'auto-mise à jour préparés pour une future version 1.0.6.
+
+## Validation
+
+* 199 tests réussis.
+
 # [1.0.4] - 2026-07-27
 
 ## Ajouté

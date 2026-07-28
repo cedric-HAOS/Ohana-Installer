@@ -364,9 +364,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.7.0"
-    assert agent.release_tag == "v1.7.0"
-    assert agent.package.filename == ("ohana_agent-1.7.0-py3-none-any.whl")
+    assert agent.version == "1.7.1"
+    assert agent.release_tag == "v1.7.1"
+    assert agent.package.filename == ("ohana_agent-1.7.1-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"

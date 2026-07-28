@@ -41,7 +41,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.0.4** fournit trois commandes principales :
+La version **1.0.5** fournit trois commandes principales :
 
 ```text
 ohana install
