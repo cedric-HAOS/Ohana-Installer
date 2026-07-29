@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.0.9**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.0.10**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée
@@ -47,15 +47,15 @@ sudo reboot
 ## 3. Télécharger la release officielle
 
 ```bash
-mkdir -p "$HOME/ohana-installer-1.0.9"
-cd "$HOME/ohana-installer-1.0.9"
+mkdir -p "$HOME/ohana-installer-1.0.10"
+cd "$HOME/ohana-installer-1.0.10"
 
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.9/ohana_installer-1.0.9-py3-none-any.whl
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.10/ohana_installer-1.0.10-py3-none-any.whl
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.9/ohana_installer-1.0.9.tar.gz
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.10/ohana_installer-1.0.10.tar.gz
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.9/SHA256SUMS
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.10/SHA256SUMS
 ```
 
 ## 4. Vérifier les artefacts
@@ -75,7 +75,7 @@ Raspberry Pi OS.
 ```bash
 sudo python3.13 -m venv /opt/ohana-installer
 sudo /opt/ohana-installer/bin/python -m pip install \
-  ./ohana_installer-1.0.9-py3-none-any.whl
+  ./ohana_installer-1.0.10-py3-none-any.whl
 sudo ln -sfn /opt/ohana-installer/bin/ohana /usr/local/bin/ohana
 ```
 
@@ -88,7 +88,7 @@ ohana --version
 Résultat attendu :
 
 ```text
-ohana 1.0.9
+ohana 1.0.10
 ```
 
 ## 6. Installer la plateforme Ohana

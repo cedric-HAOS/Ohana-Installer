@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.10] - 2026-07-29
+
+## Modifié
+
+* Manifeste aligné sur Ohana-Platform 1.0.18.
+* Ohana-Agent reste aligné sur 1.8.1.
+* Ohana-Vision est aligné sur 1.7.1.
+* La validation des noms DNS des réservations DHCP est désormais effectuée
+  dans Vision avant l’appel à Agent.
+
+## Validation
+
+* Concordance stricte avec le manifeste officiel de Platform.
+
 # [1.0.9] - 2026-07-29
 
 ## Modifié

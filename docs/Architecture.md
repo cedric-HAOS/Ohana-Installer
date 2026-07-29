@@ -178,10 +178,10 @@ Validation finale
 
 Chaque étape est validée avant de poursuivre afin de garantir une installation cohérente.
 
-La composition Platform 1.0.17 déclare les configurations DNS, NTP, MQTT,
-présence réseau, DHCP, WireGuard, Shelly Telemetry et Z-Wave attendues par
-Ohana-Agent 1.8.1. Le même manifeste épingle Ohana-Vision 1.7.0 et fournit les
-arguments de commande utilisés pour générer les unités systemd.
+La composition Platform 1.0.18 déclare les configurations DNS, NTP, MQTT,
+présence réseau, DHCP, WireGuard, Shelly Telemetry, Téléinformation et Z-Wave
+attendues par Ohana-Agent 1.8.1. Le même manifeste épingle Ohana-Vision 1.7.1
+et fournit les arguments de commande utilisés pour générer les unités systemd.
 
 Pendant une mise à jour, la comparaison des versions décide uniquement quels
 packages Python doivent être remplacés. Les configurations et les unités systemd
@@ -205,7 +205,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.0.9 cible les systèmes Linux utilisant **systemd**.
+La version 1.0.10 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 
@@ -240,5 +240,6 @@ Ohana-Installer constitue le point d'entrée officiel de l'écosystème Ohana.
 Son rôle est de rendre le déploiement, la mise à jour et la désinstallation des composants aussi simples que possible, tout en laissant à chaque produit la responsabilité de son propre domaine fonctionnel.
 
 
-La composition 1.0.17 ajoute `teleinformation.example.yaml` aux fichiers de
-configuration Agent et l’argument systemd `--teleinformation-config`.
+La composition 1.0.18 conserve la configuration Téléinformation introduite
+en 1.0.16 et épingle Vision 1.7.1 pour la validation frontend des noms DNS
+des réservations DHCP.

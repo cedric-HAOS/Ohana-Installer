@@ -1,3 +1,3 @@
 """Version publique d'Ohana-Installer."""
 
-__version__ = "1.0.9"
+__version__ = "1.0.10"
