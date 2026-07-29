@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.9] - 2026-07-29
+
+## Modifié
+
+* Manifeste aligné sur Ohana-Platform 1.0.17.
+* Ohana-Agent aligné sur 1.8.1.
+* Ohana-Vision reste aligné sur 1.7.0.
+* La mise à jour Téléinformation n’exige aucun nouveau fichier de
+  configuration : elle corrige la logique de fraîcheur du plugin Agent.
+
+## Validation
+
+* Concordance stricte avec le manifeste officiel de Platform.
+
 # [1.0.8] - 2026-07-29
 
 ## Modifié

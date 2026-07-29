@@ -41,7 +41,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.0.8** fournit trois commandes principales :
+La version **1.0.9** fournit trois commandes principales :
 
 ```text
 ohana install
@@ -192,15 +192,15 @@ release stable Platform est automatique.
 
 # Compatibilité
 
-La version 1.0.8 cible les environnements Linux utilisant **systemd**.
+La version 1.0.9 cible les environnements Linux utilisant **systemd**.
 
 Prérequis : **Python 3.13 ou supérieur**. Cette contrainte correspond au
 minimum commun exigé par Ohana-Agent et Ohana-Vision.
 
 La composition validée par `config/release-manifest.yaml` est :
 
-* Ohana-Platform 1.0.16 ;
-* Ohana-Agent 1.8.0 ;
+* Ohana-Platform 1.0.17 ;
+* Ohana-Agent 1.8.1 ;
 * Ohana-Vision 1.7.0.
 
 Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
@@ -271,7 +271,7 @@ Cette base reste volontairement concise et centrée sur la mission d'Ohana-Insta
 
 ## Téléinformation Linky
 
-La composition 1.0.8 déploie le fichier
+La composition 1.0.9 déploie le fichier
 `teleinformation.example.yaml` vers
 `/etc/ohana-agent/plugins/teleinformation.yaml` et transmet l’argument
 `--teleinformation-config` au service systemd Agent.

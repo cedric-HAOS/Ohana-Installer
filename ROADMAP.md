@@ -232,6 +232,18 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 * [x] Version publique `ohana 1.0.4`.
 * [x] 199 tests réussis.
 
+# Version 1.0.9
+
+## Composition officielle
+
+* [x] Ohana-Platform 1.0.17.
+* [x] Ohana-Agent 1.8.1.
+* [x] Ohana-Vision 1.7.0.
+* [x] Correction de la fraîcheur contextuelle Téléinformation.
+* [x] Version publique `ohana 1.0.9`.
+
+---
+
 # Version 1.0.8
 
 ## Composition officielle
