@@ -232,6 +232,29 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 * [x] Version publique `ohana 1.0.4`.
 * [x] 199 tests réussis.
 
+# Version 1.0.8
+
+## Composition officielle
+
+* [x] Ohana-Platform 1.0.16.
+* [x] Ohana-Agent 1.8.0.
+* [x] Ohana-Vision 1.7.0.
+* [x] Déployer la configuration Téléinformation Linky.
+* [x] Version publique `ohana 1.0.8`.
+
+---
+
+# Version 1.0.7
+
+## Composition officielle
+
+* [x] Ohana-Platform 1.0.15.
+* [x] Ohana-Agent 1.7.5.
+* [x] Ohana-Vision 1.6.3.
+* [x] Version publique `ohana 1.0.7`.
+
+---
+
 # Version 1.0.6
 
 ## Composition officielle

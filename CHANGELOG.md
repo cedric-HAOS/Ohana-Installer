@@ -6,6 +6,35 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.8] - 2026-07-29
+
+## Modifié
+
+* Manifeste aligné sur Ohana-Platform 1.0.16.
+* Ohana-Agent aligné sur 1.8.0.
+* Ohana-Vision aligné sur 1.7.0.
+* Déploiement de `teleinformation.example.yaml` vers
+  `plugins/teleinformation.yaml`.
+* Ajout de `--teleinformation-config` au service systemd Agent.
+
+## Validation
+
+* Concordance stricte avec le manifeste officiel de Platform.
+
+# [1.0.7] - 2026-07-29
+
+## Modifié
+
+* Manifeste aligné sur Ohana-Platform 1.0.15.
+* Ohana-Agent aligné sur 1.7.5.
+* Ohana-Vision reste aligné sur 1.6.3.
+* Tests d'auto-mise à jour préparés pour une future version 1.0.8.
+
+## Validation
+
+* Concordance stricte avec le manifeste officiel de Platform.
+* 199 tests réussis.
+
 # [1.0.6] - 2026-07-29
 
 ## Modifié

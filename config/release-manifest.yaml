@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.14"
+  version: "1.0.16"
 
 runtime:
   python:
@@ -12,12 +12,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.7.4"
-    release_tag: v1.7.4
+    version: "1.8.0"
+    release_tag: v1.8.0
 
     package:
       type: wheel
-      filename: ohana_agent-1.7.4-py3-none-any.whl
+      filename: ohana_agent-1.8.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent
@@ -49,6 +49,9 @@ components:
         - source: shelly-telemetry.example.yaml
           destination: plugins/shelly-telemetry.yaml
 
+        - source: teleinformation.example.yaml
+          destination: plugins/teleinformation.yaml
+
         - source: zwave.example.yaml
           destination: plugins/zwave.yaml
 
@@ -76,6 +79,8 @@ components:
         - /etc/ohana-agent/plugins/dhcp.yaml
         - --shelly-telemetry-config
         - /etc/ohana-agent/plugins/shelly-telemetry.yaml
+        - --teleinformation-config
+        - /etc/ohana-agent/plugins/teleinformation.yaml
         - --wireguard-config
         - /etc/ohana-agent/plugins/wireguard.yaml
         - --zwave-config
@@ -84,12 +89,12 @@ components:
   vision:
     name: Ohana-Vision
     repository: cedric-HAOS/Ohana-Vision
-    version: "1.6.3"
-    release_tag: v1.6.3
+    version: "1.7.0"
+    release_tag: v1.7.0
 
     package:
       type: wheel
-      filename: ohana_vision-1.6.3-py3-none-any.whl
+      filename: ohana_vision-1.7.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-vision
