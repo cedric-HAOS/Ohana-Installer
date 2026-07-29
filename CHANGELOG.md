@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.0.6] - 2026-07-29
+
+## Modifié
+
+* Manifeste aligné sur Ohana-Platform 1.0.14.
+* Ohana-Agent aligné sur 1.7.4.
+* Ohana-Vision aligné sur 1.6.3.
+* Tests d'auto-mise à jour préparés pour une future version 1.0.7.
+
+## Validation
+
+* Concordance stricte avec le manifeste officiel de Platform.
+* 199 tests réussis.
+
 # [1.0.5] - 2026-07-28
 
 ## Ajouté
@@ -16,9 +30,9 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Modifié
 
-* Manifest aligné sur Ohana-Platform 1.0.11.
-* Ohana-Agent aligné sur 1.7.1.
-* Ohana-Vision aligné sur 1.6.0.
+* Manifeste aligné sur Ohana-Platform 1.0.13.
+* Ohana-Agent aligné sur 1.7.3.
+* Ohana-Vision aligné sur 1.6.2.
 * Tests d'auto-mise à jour préparés pour une future version 1.0.6.
 
 ## Validation

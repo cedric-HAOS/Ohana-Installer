@@ -13,13 +13,14 @@ Il ne contient aucune logique métier propre aux composants qu'il installe.
 # Position dans l'écosystème
 
 ```text
-                     Ohana Platform
-                            │
-        ┌───────────────────┼───────────────────┐
-        │                   │                   │
-        ▼                   ▼                   ▼
- Ohana-Agent       Ohana-Vision      Ohana-Installer
-    Observe             Visualise          Déploie
+                         Ohana Platform
+                                │
+        ┌───────────────┬───────┼───────┬───────────────┐
+        │               │       │       │               │
+        ▼               ▼       ▼       ▼               ▼
+ Ohana-Agent    Ohana-Vision  Installer  Ohana-House  Contrats communs
+ Observe et     Visualise et   Déploie    Documente    et composition
+ configure      administre
 ```
 
 Les responsabilités sont volontairement séparées.
@@ -30,6 +31,7 @@ Les responsabilités sont volontairement séparées.
 | Ohana-Agent     | Observe l'infrastructure et produit des observations.             |
 | Ohana-Vision    | Présente les données collectées.                                  |
 | Ohana-Installer | Gère le cycle de vie des composants.                              |
+| Ohana-House     | Documente le déploiement domestique réel et cible.                 |
 
 Cette séparation limite le couplage entre les projets et facilite leur évolution indépendante.
 
@@ -176,13 +178,14 @@ Validation finale
 
 Chaque étape est validée avant de poursuivre afin de garantir une installation cohérente.
 
-La composition Platform 1.0.7 déclare les configurations DNS, NTP, MQTT,
-présence réseau et DHCP attendues par Ohana-Agent 1.5.0. Le même manifest
-fournit les arguments de commande utilisés pour générer son unité systemd.
+La composition Platform 1.0.14 déclare les configurations DNS, NTP, MQTT,
+présence réseau, DHCP, WireGuard, Shelly Telemetry et Z-Wave attendues par
+Ohana-Agent 1.7.4. Le même manifeste épingle Ohana-Vision 1.6.3 et fournit les
+arguments de commande utilisés pour générer les unités systemd.
 
 Pendant une mise à jour, la comparaison des versions décide uniquement quels
 packages Python doivent être remplacés. Les configurations et les unités systemd
-sont toujours réconciliées avec le manifest courant sans écraser les fichiers
+sont toujours réconciliées avec le manifeste courant sans écraser les fichiers
 locaux existants.
 
 ---
@@ -202,7 +205,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.0.5 cible les systèmes Linux utilisant **systemd**.
+La version 1.0.6 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 

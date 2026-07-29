@@ -41,7 +41,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.0.5** fournit trois commandes principales :
+La version **1.0.6** fournit trois commandes principales :
 
 ```text
 ohana install
@@ -192,19 +192,20 @@ release stable Platform est automatique.
 
 # Compatibilité
 
-La version 1.0.4 est conçue pour les environnements Linux utilisant **systemd**.
+La version 1.0.6 cible les environnements Linux utilisant **systemd**.
 
 Prérequis : **Python 3.13 ou supérieur**. Cette contrainte correspond au
 minimum commun exigé par Ohana-Agent et Ohana-Vision.
 
-Les composants installés sont :
+La composition validée par `config/release-manifest.yaml` est :
 
-* Ohana-Agent 1.5.0 ;
-* Ohana-Vision 1.4.0.
+* Ohana-Platform 1.0.14 ;
+* Ohana-Agent 1.7.4 ;
+* Ohana-Vision 1.6.3.
 
-La composition Ohana-Platform 1.0.7 déploie pour Agent les configurations des
-plugins DNS, NTP, MQTT, présence réseau et DHCP, puis transmet leurs chemins
-au service systemd.
+Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
+DHCP, WireGuard, Shelly Telemetry et Z-Wave. Le manifeste détermine également
+les arguments exacts transmis aux unités systemd.
 
 ---
 
