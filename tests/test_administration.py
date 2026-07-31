@@ -227,3 +227,108 @@ def test_prepare_administration_secures_plugin_configurations(
             "ohana-agent",
             0o660,
         ) in secured_paths
+
+
+def test_prepare_administration_enables_network_helper(
+    tmp_path: Path,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    nmcli = tmp_path / "nmcli"
+    nmcli.write_text("#!/bin/sh\n", encoding="utf-8")
+    nmcli.chmod(0o755)
+    entrypoint = tmp_path / "ohana-agent-network-helper"
+    entrypoint.write_text("#!/bin/sh\n", encoding="utf-8")
+    entrypoint.chmod(0o755)
+    helper = tmp_path / "local" / "ohana-network-helper"
+    sudoers = tmp_path / "sudoers.d" / "ohana-agent-network"
+
+    result = prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        systemd_directory=tmp_path / "systemd",
+        require_linux=False,
+        secure_ownership=False,
+        network_helper_path=helper,
+        network_sudoers_path=sudoers,
+        network_entrypoint_path=entrypoint,
+        nmcli_path=nmcli,
+        visudo_path=tmp_path / "missing-visudo",
+    )
+
+    content = agent_configuration.read_text(encoding="utf-8")
+    assert result.network_enabled is True
+    assert "  network:\n    enabled: true" in content
+    assert f"    helper_path: {helper.as_posix()}" in content
+
+
+def test_prepare_administration_omits_network_for_legacy_agent(
+    tmp_path: Path,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+
+    result = prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        systemd_directory=tmp_path / "systemd",
+        require_linux=False,
+        secure_ownership=False,
+        agent_version="1.7.3",
+        nmcli_path=tmp_path / "nmcli",
+        network_entrypoint_path=tmp_path / "missing-entrypoint",
+    )
+
+    content = agent_configuration.read_text(encoding="utf-8")
+    assert result.network_enabled is False
+    assert "  network:" not in content
+    assert "  dhcp:" in content
+
+
+def test_prepare_administration_removes_network_before_legacy_downgrade(
+    tmp_path: Path,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    agent_configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  host: 127.0.0.1
+  port: 8765
+  token_file: /etc/ohana-agent/management.token
+  network:
+    enabled: true
+    helper_path: /usr/local/sbin/ohana-network-helper
+    sudo_path: /usr/bin/sudo
+    rollback_seconds: 90
+  dhcp:
+    enabled: false
+""",
+        encoding="utf-8",
+    )
+
+    prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        systemd_directory=tmp_path / "systemd",
+        require_linux=False,
+        secure_ownership=False,
+        agent_version="1.10.0",
+    )
+
+    content = agent_configuration.read_text(encoding="utf-8")
+    assert "  network:" not in content
+    assert "  dhcp:\n    enabled: false" in content

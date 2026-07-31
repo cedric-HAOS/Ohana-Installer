@@ -6,6 +6,60 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.6.0 — Interface interactive finale
+
+## 1. Menu principal
+
+* [x] Ouvrir le menu avec `ohana` sans argument.
+* [x] Installer ou mettre à jour la composition recommandée.
+* [x] Sélectionner une composition antérieure dans le catalogue Platform.
+* [x] Quitter sans modifier le système.
+
+## 2. Réseau INFRA-01
+
+* [x] Lire et préremplir la configuration NetworkManager active.
+* [x] Accepter un masque CIDR ou décimal.
+* [x] Appliquer sans installer ni mettre à jour Agent/Vision.
+* [x] Restaurer automatiquement l’ancienne configuration sans confirmation.
+* [x] Fournir la commande explicite `ohana network`.
+
+## 3. Compatibilité
+
+* [x] Conserver `ohana install`, `update`, `versions` et `uninstall`.
+* [x] Ne pas ajouter de commande `ohana interactive`.
+* [x] Continuer à faire évoluer les couples uniquement dans Ohana-Platform.
+* [x] Version publique `ohana 1.6.0`.
+* [x] 242 tests réussis.
+
+---
+
+# Version 1.5.0 — Catalogue des compositions
+
+## 1. Catalogue Platform
+
+* [x] Télécharger `release-catalog.yaml` depuis la dernière release Platform.
+* [x] Lister les couples Agent/Vision avec `ohana versions`.
+* [x] Sélectionner une composition par version Platform.
+* [x] Sélectionner une composition par versions Agent et Vision.
+* [x] Vérifier la concordance du catalogue avec le manifeste sélectionné.
+
+## 2. Installation et mise à jour
+
+* [x] Installer une composition historique sans modifier le code de l’Installer.
+* [x] Refuser les couples non déclarés.
+* [x] Préserver la sélection après l’auto-mise à jour de l’Installer.
+* [x] Autoriser une rétrogradation uniquement avec `--allow-downgrade`.
+
+## 3. Composition recommandée
+
+* [x] Ohana-Platform 1.0.22.
+* [x] Ohana-Agent 1.11.0.
+* [x] Ohana-Vision 1.10.0.
+* [x] Version publique `ohana 1.5.0`.
+* [x] 230 tests réussis.
+
+---
+
 # Version 1.0.0
 
 ## 1. Initialisation du projet
@@ -308,6 +362,21 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.0.11
+
+## Composition officielle
+
+* [x] Ohana-Platform 1.0.19.
+* [x] Ohana-Agent 1.9.0.
+* [x] Ohana-Vision 1.8.0.
+* [x] Déployer `home-assistant-telemetry.example.yaml` vers
+  `plugins/home-assistant-telemetry.yaml`.
+* [x] Migrer une configuration locale `shelly-telemetry.yaml` sans l’écraser.
+* [x] Version publique `ohana 1.0.11`.
+* [x] 200 tests réussis.
+
+---
+
 # Évolutions futures
 
 Les fonctionnalités suivantes sont volontairement reportées après la version 1.0.5 :
@@ -324,3 +393,26 @@ Les fonctionnalités suivantes sont volontairement reportées après la version 
 * Déploiement multi-sites.
 
 La priorité reste de conserver un installateur officiel simple, fiable et stable pour l'écosystème Ohana.
+
+# Version 1.0.12
+
+**Statut : terminé.**
+
+* [x] Ohana-Platform 1.0.20.
+* [x] Ohana-Agent 1.10.0.
+* [x] Ohana-Vision 1.9.0.
+* [x] Déployer la configuration Téléinformation directe sans écraser les
+  installations historiques.
+* [x] Préserver les plages horaires enregistrées dans l’infrastructure.
+* [x] Version publique `ohana 1.0.12`.
+
+---
+
+
+
+# Version 1.0.13
+
+- [x] Composition Agent 1.11.0 / Vision 1.10.0 / Platform 1.0.21.
+- [x] Préparation du helper NetworkManager et de la règle sudoers.
+- [x] Provisionnement IPv4 initial statique ou DHCP.
+- [x] Tests du déploiement réseau sécurisé.

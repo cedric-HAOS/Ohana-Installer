@@ -43,6 +43,10 @@ def test_uninstall_removes_services_and_components(
         lambda: operations.append("reload"),
     )
     monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.remove_network_administration",
+        lambda: operations.append("network-admin") or True,
+    )
+    monkeypatch.setattr(
         "ohana_installer.commands.uninstall._remove_installation_path",
         lambda path: operations.append(f"path:{path}") or True,
     )
@@ -57,6 +61,7 @@ def test_uninstall_removes_services_and_components(
         "remove:ohana-agent.service",
         "remove:ohana-vision.service",
         "reload",
+        "network-admin",
         f"path:{AGENT_INSTALLATION_PATH}",
         f"path:{VISION_INSTALLATION_PATH}",
     ]
@@ -82,6 +87,18 @@ def test_uninstall_accepts_already_absent_installation(
     monkeypatch.setattr(
         "ohana_installer.commands.uninstall._remove_installation_path",
         lambda path: False,
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.NETWORK_HELPER_PATH",
+        Path("/definitely/missing/helper"),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.NETWORK_SUDOERS_PATH",
+        Path("/definitely/missing/sudoers"),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.NETWORK_STATE_DIRECTORY",
+        Path("/definitely/missing/state"),
     )
 
     assert main(["uninstall", "--yes"]) == 0

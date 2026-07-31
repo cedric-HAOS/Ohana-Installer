@@ -8,6 +8,16 @@ import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
+from ohana_installer.network import (
+    AGENT_NETWORK_HELPER_ENTRYPOINT,
+    NETWORK_HELPER_PATH,
+    NETWORK_SUDOERS_PATH,
+    NMCLI_PATH,
+    VISUDO_PATH,
+    NetworkAdministrationPreparation,
+    NetworkProvisioningError,
+    prepare_network_administration,
+)
 from ohana_installer.systemd import (
     enable_systemd_service,
     start_systemd_service,
@@ -21,6 +31,7 @@ AGENT_PLUGIN_CONFIGURATION_FILENAMES = (
     "dns.yaml",
     "ntp.yaml",
     "mqtt.yaml",
+    "home-assistant-telemetry.yaml",
 )
 
 VISION_CONFIGURATION_DIRECTORY = Path("/etc/ohana-vision")
@@ -41,6 +52,7 @@ DNSMASQ_MANAGED_FILES = (
 SYSTEMD_SYSTEM_DIRECTORY = Path("/etc/systemd/system")
 DHCP_RELOAD_SERVICE_NAME = "ohana-dhcp-reload.service"
 DHCP_RELOAD_PATH_NAME = "ohana-dhcp-reload.path"
+NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 
 
 class AdministrationPreparationError(RuntimeError):
@@ -54,6 +66,7 @@ class AdministrationPreparation:
     configured: bool
     dhcp_enabled: bool
     token_created: bool
+    network_enabled: bool = False
     units_installed: tuple[Path, ...] = ()
 
 
@@ -69,6 +82,12 @@ def prepare_administration(
     systemd_directory: Path = SYSTEMD_SYSTEM_DIRECTORY,
     require_linux: bool = True,
     secure_ownership: bool = True,
+    network_helper_path: Path = NETWORK_HELPER_PATH,
+    network_sudoers_path: Path = NETWORK_SUDOERS_PATH,
+    network_entrypoint_path: Path = AGENT_NETWORK_HELPER_ENTRYPOINT,
+    nmcli_path: Path = NMCLI_PATH,
+    visudo_path: Path = VISUDO_PATH,
+    agent_version: str | None = None,
 ) -> AdministrationPreparation:
     """Configurer automatiquement les échanges d'administration locaux."""
     if require_linux and os.name != "posix":
@@ -76,6 +95,7 @@ def prepare_administration(
             configured=False,
             dhcp_enabled=False,
             token_created=False,
+            network_enabled=False,
         )
 
     required_paths = (
@@ -108,12 +128,15 @@ def prepare_administration(
         secure_ownership=secure_ownership,
     )
 
+    network_supported = supports_network_administration(agent_version)
+
     _append_section_if_missing(
         agent_configuration_path,
         section_name="administration",
         content=_agent_administration_section(
             dhcp_enabled=dhcp_enabled,
             token_path=agent_token_path,
+            network_supported=network_supported,
         ),
     )
     _append_section_if_missing(
@@ -141,6 +164,32 @@ def prepare_administration(
         secure_ownership=secure_ownership,
     )
 
+    if network_supported:
+        try:
+            network_preparation = prepare_network_administration(
+                helper_path=network_helper_path,
+                sudoers_path=network_sudoers_path,
+                entrypoint_path=network_entrypoint_path,
+                nmcli_path=nmcli_path,
+                visudo_path=visudo_path,
+                secure_ownership=secure_ownership,
+            )
+        except NetworkProvisioningError as error:
+            raise AdministrationPreparationError(str(error)) from error
+
+        _ensure_agent_network_section(
+            agent_configuration_path,
+            enabled=network_preparation.enabled,
+            helper_path=network_helper_path,
+        )
+    else:
+        _remove_agent_network_section(agent_configuration_path)
+        network_preparation = NetworkAdministrationPreparation(
+            enabled=False,
+            helper_installed=False,
+            sudoers_installed=False,
+        )
+
     installed_units: tuple[Path, ...] = ()
 
     if dhcp_enabled:
@@ -156,6 +205,7 @@ def prepare_administration(
         configured=True,
         dhcp_enabled=dhcp_enabled,
         token_created=token_created,
+        network_enabled=network_preparation.enabled,
         units_installed=installed_units,
     )
 
@@ -246,21 +296,111 @@ def _agent_administration_section(
     *,
     dhcp_enabled: bool,
     token_path: Path,
+    network_supported: bool,
 ) -> str:
     enabled = "true" if dhcp_enabled else "false"
 
-    return "\n".join(
+    lines = [
+        "administration:",
+        "  enabled: true",
+        "  host: 127.0.0.1",
+        "  port: 8765",
+        f"  token_file: {token_path.as_posix()}",
+    ]
+    if network_supported:
+        lines.extend(
+            [
+                "  network:",
+                "    enabled: false",
+                "    helper_path: /usr/local/sbin/ohana-network-helper",
+                "    sudo_path: /usr/bin/sudo",
+                "    rollback_seconds: 90",
+            ]
+        )
+    lines.extend(
         [
-            "administration:",
-            "  enabled: true",
-            "  host: 127.0.0.1",
-            "  port: 8765",
-            f"  token_file: {token_path.as_posix()}",
             "  dhcp:",
             f"    enabled: {enabled}",
             "",
         ]
     )
+    return "\n".join(lines)
+
+
+def _ensure_agent_network_section(
+    path: Path,
+    *,
+    enabled: bool,
+    helper_path: Path,
+) -> None:
+    """Ajouter ou mettre à jour la section réseau sans dupliquer administration."""
+    content = path.read_text(encoding="utf-8")
+    enabled_text = "true" if enabled else "false"
+    if "  network:\n" in content:
+        lines = content.splitlines()
+        in_network = False
+        for index, line in enumerate(lines):
+            if line == "  network:":
+                in_network = True
+                continue
+            if in_network and line.startswith("  ") and not line.startswith("    "):
+                in_network = False
+            if in_network and line.strip().startswith("enabled:"):
+                lines[index] = f"    enabled: {enabled_text}"
+            if in_network and line.strip().startswith("helper_path:"):
+                lines[index] = f"    helper_path: {helper_path.as_posix()}"
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        return
+
+    lines = content.splitlines()
+    insertion_index = None
+    for index, line in enumerate(lines):
+        if line.startswith("  dhcp:"):
+            insertion_index = index
+            break
+    block = [
+        "  network:",
+        f"    enabled: {enabled_text}",
+        f"    helper_path: {helper_path.as_posix()}",
+        "    sudo_path: /usr/bin/sudo",
+        "    rollback_seconds: 90",
+    ]
+    if insertion_index is None:
+        lines.extend(block)
+    else:
+        lines[insertion_index:insertion_index] = block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
+def supports_network_administration(agent_version: str | None) -> bool:
+    """Indiquer si la version Agent comprend le contrat NetworkManager du Lot C."""
+    if agent_version is None:
+        return True
+    try:
+        parts = tuple(int(part) for part in agent_version.split("."))
+    except ValueError as error:
+        raise AdministrationPreparationError(
+            f"Version Ohana-Agent invalide : {agent_version}."
+        ) from error
+    if len(parts) != 3:
+        raise AdministrationPreparationError(f"Version Ohana-Agent invalide : {agent_version}.")
+    return parts >= NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION
+
+
+def _remove_agent_network_section(path: Path) -> None:
+    """Retirer la section inconnue des Agents antérieurs à la version 1.11.0."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    result: list[str] = []
+    index = 0
+    while index < len(lines):
+        if lines[index] != "  network:":
+            result.append(lines[index])
+            index += 1
+            continue
+        index += 1
+        while index < len(lines) and (lines[index].startswith("    ") or not lines[index].strip()):
+            index += 1
+    path.write_text("\n".join(result).rstrip() + "\n", encoding="utf-8", newline="\n")
 
 
 def _vision_agent_section(

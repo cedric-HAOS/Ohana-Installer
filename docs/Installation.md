@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.0.10**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.6.0**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée
@@ -47,15 +47,15 @@ sudo reboot
 ## 3. Télécharger la release officielle
 
 ```bash
-mkdir -p "$HOME/ohana-installer-1.0.10"
-cd "$HOME/ohana-installer-1.0.10"
+mkdir -p "$HOME/ohana-installer-1.6.0"
+cd "$HOME/ohana-installer-1.6.0"
 
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.10/ohana_installer-1.0.10-py3-none-any.whl
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.6.0/ohana_installer-1.6.0-py3-none-any.whl
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.10/ohana_installer-1.0.10.tar.gz
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.6.0/ohana_installer-1.6.0.tar.gz
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.0.10/SHA256SUMS
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.6.0/SHA256SUMS
 ```
 
 ## 4. Vérifier les artefacts
@@ -75,7 +75,7 @@ Raspberry Pi OS.
 ```bash
 sudo python3.13 -m venv /opt/ohana-installer
 sudo /opt/ohana-installer/bin/python -m pip install \
-  ./ohana_installer-1.0.10-py3-none-any.whl
+  ./ohana_installer-1.6.0-py3-none-any.whl
 sudo ln -sfn /opt/ohana-installer/bin/ohana /usr/local/bin/ohana
 ```
 
@@ -88,25 +88,43 @@ ohana --version
 Résultat attendu :
 
 ```text
-ohana 1.0.10
+ohana 1.6.0
 ```
 
-## 6. Installer la plateforme Ohana
+## 6. Ouvrir Ohana-Installer
+
+```bash
+sudo ohana
+```
+
+Le menu propose :
+
+```text
+1. Installer ou mettre à jour Agent et Vision
+2. Installer une composition antérieure
+3. Configurer le réseau d’INFRA-01
+4. Quitter
+```
+
+Choisir **1** pour une installation neuve ou une mise à jour vers la composition
+recommandée. Les commandes explicites restent disponibles, notamment :
 
 ```bash
 sudo ohana install
+sudo ohana update
 ```
 
 L'installateur :
 
 1. vérifie Linux, systemd, Python, pip, les privilèges et l'accès à GitHub ;
-2. découvre la dernière release stable d'Ohana-Platform ;
-3. vérifie cryptographiquement le manifeste et tous les téléchargements ;
-4. affiche les versions d'Ohana-Agent et d'Ohana-Vision ;
-5. télécharge les configurations Agent, dont DNS, NTP, MQTT, présence réseau
+2. télécharge le catalogue publié par la dernière release d’Ohana-Platform ;
+3. sélectionne la composition recommandée ou celle demandée explicitement ;
+4. vérifie cryptographiquement le catalogue, le manifeste et tous les téléchargements ;
+5. affiche les versions d'Ohana-Agent et d'Ohana-Vision ;
+6. télécharge les configurations Agent, dont DNS, NTP, MQTT, présence réseau
    et DHCP ;
-6. demande une confirmation avant de modifier le système ;
-7. installe et démarre les deux services systemd.
+7. demande une confirmation avant de modifier le système ;
+8. installe et démarre les deux services systemd.
 
 Répondre `oui` après avoir vérifié les versions affichées. Pour une installation
 automatisée, la confirmation peut être acceptée explicitement :
@@ -114,6 +132,31 @@ automatisée, la confirmation peut être acceptée explicitement :
 ```bash
 sudo ohana install --yes
 ```
+
+
+### Choisir une version différente
+
+Lister les couples publiés :
+
+```bash
+ohana versions
+```
+
+Installer la composition Platform 1.0.20 :
+
+```bash
+sudo ohana install --platform-version 1.0.20
+```
+
+Installer le couple Agent 1.10.0 / Vision 1.9.0 :
+
+```bash
+sudo ohana install \
+  --agent-version 1.10.0 \
+  --vision-version 1.9.0
+```
+
+Le couple doit être déclaré dans le catalogue Platform.
 
 ## 7. Configurer graphiquement l'infrastructure
 
@@ -168,15 +211,16 @@ sudo ohana update
 La commande vérifie d'abord la dernière release stable d'Ohana-Installer. Si
 une version plus récente existe, elle remplace le package dans
 `/opt/ohana-installer`, contrôle la nouvelle version puis reprend automatiquement
-la commande. Elle détecte ensuite la dernière release stable d'Ohana-Platform,
-compare les versions installées, affiche le plan de mise à jour et demande
-confirmation.
+la commande. Elle utilise ensuite la composition Platform recommandée, ou celle
+sélectionnée avec `--platform-version` ou le couple Agent/Vision, compare les
+versions installées, affiche le plan de mise à jour et demande confirmation.
 
 Chaque package déjà à la version cible est conservé sans téléchargement ni
 réinstallation. La commande réconcilie néanmoins les fichiers de configuration
 manquants et les unités systemd avec le manifeste Platform, puis redémarre et
 vérifie les services. Les configurations locales existantes ne sont pas écrasées.
-Les rétrogradations automatiques restent refusées.
+Les rétrogradations restent refusées par défaut. Une composition historique
+explicitement choisie peut être appliquée avec `--allow-downgrade`.
 
 L'option `--yes` est disponible pour une automatisation volontaire :
 
@@ -219,3 +263,26 @@ sudo journalctl -u ohana-vision.service -n 100 --no-pager
 
 * [Documentation officielle de Raspberry Pi OS](https://www.raspberrypi.com/documentation/computers/os.html)
 * [Package Debian Trixie python3.13-venv](https://packages.debian.org/trixie/python3.13-venv)
+
+
+## Adresse statique d’INFRA-01
+
+Dans le menu `sudo ohana`, choisir **3. Configurer le réseau d’INFRA-01**. Les
+valeurs actives sont préremplies. Saisir l’adresse, le masque ou préfixe, la
+passerelle et les DNS, puis confirmer la nouvelle connexion. Sans confirmation,
+l’ancienne configuration est restaurée automatiquement après 180 secondes.
+
+Cette opération ne télécharge et ne réinstalle aucun composant. La commande
+explicite équivalente reste disponible :
+
+```bash
+sudo ohana network --yes \
+  --interface eth0 \
+  --address 192.168.1.10/24 \
+  --gateway 192.168.1.1 \
+  --dns 192.168.1.11 \
+  --dns 192.168.1.12
+```
+
+Le helper NetworkManager nécessite une installation compatible avec Ohana-Agent
+1.11.0 ou une version ultérieure.

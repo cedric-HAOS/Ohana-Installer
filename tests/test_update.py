@@ -60,7 +60,7 @@ def _prepare_administration_without_system_changes(
     )
     monkeypatch.setattr(
         "ohana_installer.commands.update.prepare_administration",
-        lambda: preparation,
+        lambda **_kwargs: preparation,
     )
     monkeypatch.setattr(
         "ohana_installer.commands.update.activate_administration",
@@ -213,7 +213,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    release = _installer_release("1.0.11")
+    release = _installer_release("1.6.1")
     operations: list[str] = []
 
     monkeypatch.setattr(
@@ -249,7 +249,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
         "verify_component_command",
         lambda **kwargs: InstalledPythonComponent(
             name="Ohana-Installer",
-            version="1.0.11",
+            version="1.6.1",
             environment_path=Path(sys.prefix),
             executable_path=Path(sys.prefix) / "bin" / "ohana",
         ),
@@ -262,12 +262,12 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
 
     assert result == "updated"
     assert operations == [
-        "download:ohana_installer-1.0.11-py3-none-any.whl",
-        (f"upgrade:ohana_installer-1.0.11-py3-none-any.whl:{sys.executable}"),
+        "download:ohana_installer-1.6.1-py3-none-any.whl",
+        (f"upgrade:ohana_installer-1.6.1-py3-none-any.whl:{sys.executable}"),
     ]
     output = capsys.readouterr().out
-    assert "1.0.11 téléchargé et vérifié" in output
-    assert "1.0.11 mis à jour" in output
+    assert "1.6.1 téléchargé et vérifié" in output
+    assert "1.6.1 mis à jour" in output
 
 
 def test_installer_self_update_can_be_declined(
@@ -277,7 +277,7 @@ def test_installer_self_update_can_be_declined(
     monkeypatch.setattr(
         update_command,
         "discover_latest_release",
-        lambda repository: _installer_release("1.0.11"),
+        lambda repository: _installer_release("1.6.1"),
     )
     monkeypatch.setattr(
         update_command,
@@ -307,7 +307,7 @@ def test_installer_self_update_requires_one_wheel(
         update_command,
         "discover_latest_release",
         lambda repository: _installer_release(
-            "1.0.11",
+            "1.6.1",
             include_wheel=False,
         ),
     )
@@ -1060,4 +1060,73 @@ def test_update_refuses_automatic_downgrade(
     )
 
     assert main(["update", "--yes"]) == 3
-    assert "rétrogradation automatique est refusée" in capsys.readouterr().out
+    assert "--allow-downgrade" in capsys.readouterr().out
+
+
+def test_restart_update_preserves_selected_pair_and_downgrade(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from ohana_installer.release_selection import ReleaseSelection
+
+    received: tuple[str, list[str]] | None = None
+
+    class RestartCalled(RuntimeError):
+        pass
+
+    def fake_execv(executable: str, arguments: list[str]) -> None:
+        nonlocal received
+        received = (executable, arguments)
+        raise RestartCalled
+
+    monkeypatch.setattr(update_command.os, "execv", fake_execv)
+
+    with pytest.raises(RestartCalled):
+        update_command._restart_update(
+            assume_yes=True,
+            selection=ReleaseSelection(
+                agent_version="1.10.0",
+                vision_version="1.9.0",
+            ),
+            allow_downgrade=True,
+        )
+
+    assert received == (
+        sys.executable,
+        [
+            sys.executable,
+            "-m",
+            "ohana_installer",
+            "update",
+            "--yes",
+            "--agent-version",
+            "1.10.0",
+            "--vision-version",
+            "1.9.0",
+            "--allow-downgrade",
+        ],
+    )
+
+
+def test_reject_downgrades_accepts_explicit_authorization() -> None:
+    manifest = _build_manifest()
+    installed = {
+        component.identifier: _build_installed_component(
+            component.name,
+            f"ohana-{component.identifier}",
+            version="2.0.0",
+        )
+        for component in manifest.components
+    }
+
+    update_command._reject_downgrades(
+        manifest,
+        installed,
+        allow_downgrade=True,
+    )
+
+
+def test_update_rejects_allow_downgrade_without_explicit_selection(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    assert main(["update", "--allow-downgrade", "--yes"]) == 3
+    assert "exige une version Platform" in capsys.readouterr().out

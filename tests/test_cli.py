@@ -45,7 +45,7 @@ def _prepare_administration_without_system_changes(
     )
     monkeypatch.setattr(
         "ohana_installer.commands.install.prepare_administration",
-        lambda: preparation,
+        lambda **_kwargs: preparation,
     )
     monkeypatch.setattr(
         "ohana_installer.commands.install.activate_administration",
@@ -139,16 +139,35 @@ def _build_installed_services(
     )
 
 
-def test_cli_requires_command(
+def test_cli_without_command_opens_interactive_menu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    calls: list[object] = []
+
+    monkeypatch.setattr(
+        "ohana_installer.cli._interactive_terminal_available",
+        lambda: True,
+    )
+    monkeypatch.setattr(
+        "ohana_installer.cli.run_interactive",
+        lambda *, command_runner: calls.append(command_runner) or 0,
+    )
+
+    assert main([]) == 0
+    assert len(calls) == 1
+
+
+def test_cli_without_command_rejects_non_interactive_terminal(
+    monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        main([])
+    monkeypatch.setattr(
+        "ohana_installer.cli._interactive_terminal_available",
+        lambda: False,
+    )
 
-    assert exc_info.value.code == 2
-
-    error_output = capsys.readouterr().err
-    assert "the following arguments are required" in error_output
+    assert main([]) == 2
+    assert "terminal interactif" in capsys.readouterr().err
 
 
 def test_cli_displays_version(
@@ -184,6 +203,8 @@ def test_cli_displays_help(
     assert "install" in output
     assert "update" in output
     assert "uninstall" in output
+    assert "versions" in output
+    assert "network" in output
     assert "--version" in output
 
 
@@ -193,6 +214,7 @@ def test_cli_displays_help(
         "install",
         "update",
         "uninstall",
+        "network",
     ],
 )
 def test_command_displays_help(
@@ -316,34 +338,34 @@ def test_install_fails_when_manifest_is_invalid(
     assert "schéma invalide" in output
 
 
-def test_load_official_manifest_uses_expected_destination(
+def test_load_official_manifest_uses_catalog_default(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    from ohana_installer.release_selection import ReleaseSelection
+
     expected_manifest = _build_manifest()
-    received_destination: Path | None = None
+    received: tuple[Path, ReleaseSelection] | None = None
 
     def fake_download(
-        destination: Path,
-    ) -> PlatformManifest:
-        nonlocal received_destination
-        received_destination = destination
-
-        return expected_manifest
+        directory: Path,
+        selection: ReleaseSelection,
+    ) -> tuple[PlatformManifest, object]:
+        nonlocal received
+        received = (directory, selection)
+        return expected_manifest, object()
 
     monkeypatch.setattr(
-        "ohana_installer.commands.install.download_platform_manifest",
+        "ohana_installer.commands.install.download_selected_manifest",
         fake_download,
     )
 
-    from ohana_installer.commands.install import (
-        _load_official_manifest,
-    )
+    from ohana_installer.commands.install import _load_official_manifest
 
     result = _load_official_manifest(tmp_path)
 
     assert result == expected_manifest
-    assert received_destination == (tmp_path / "release-manifest.yaml")
+    assert received == (tmp_path, ReleaseSelection())
 
 
 def test_install_downloads_and_installs_official_components(

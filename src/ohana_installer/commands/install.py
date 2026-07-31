@@ -7,12 +7,14 @@ import shutil
 import tempfile
 from contextlib import suppress
 from dataclasses import dataclass
+from ipaddress import IPv4Address, IPv4Interface
 from pathlib import Path
 
 from ohana_installer.administration import (
     AdministrationPreparationError,
     activate_administration,
     prepare_administration,
+    supports_network_administration,
 )
 from ohana_installer.confirmation import confirm_action
 from ohana_installer.environment import EnvironmentCheck, run_environment_checks
@@ -22,12 +24,16 @@ from ohana_installer.github import (
     DownloadError,
     download_component_packages,
     download_configuration_files,
-    download_platform_manifest,
 )
 from ohana_installer.manifest import (
     ComponentManifest,
     ManifestError,
     PlatformManifest,
+)
+from ohana_installer.network import (
+    InitialNetworkConfiguration,
+    NetworkProvisioningError,
+    apply_initial_network_configuration,
 )
 from ohana_installer.python_package import (
     InstalledPythonComponent,
@@ -36,6 +42,12 @@ from ohana_installer.python_package import (
     install_wheel,
     secure_installation_tree,
     verify_component_command,
+)
+from ohana_installer.release_selection import (
+    ReleaseSelection,
+    add_release_selection_arguments,
+    download_selected_manifest,
+    selection_from_args,
 )
 from ohana_installer.system_account import (
     SystemAccount,
@@ -59,7 +71,6 @@ from ohana_installer.systemd import (
 
 INSTALLATION_ERROR = 3
 
-MANIFEST_FILENAME = "release-manifest.yaml"
 
 AGENT_IDENTIFIER = "agent"
 AGENT_INSTALLATION_PATH = Path("/opt/ohana-agent")
@@ -110,7 +121,75 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Accepter automatiquement les confirmations.",
     )
+    add_release_selection_arguments(parser)
+    parser.add_argument(
+        "--network-interface",
+        help="Interface NetworkManager à provisionner, par exemple eth0.",
+    )
+    network_mode = parser.add_mutually_exclusive_group()
+    network_mode.add_argument(
+        "--network-dhcp",
+        action="store_true",
+        help="Configurer l'interface de l'Agent en DHCP.",
+    )
+    network_mode.add_argument(
+        "--network-address",
+        help="Adresse IPv4 statique avec préfixe, par exemple 192.168.1.10/24.",
+    )
+    parser.add_argument(
+        "--network-gateway",
+        help="Passerelle IPv4 de la configuration statique.",
+    )
+    parser.add_argument(
+        "--network-dns",
+        action="append",
+        default=[],
+        help="Serveur DNS IPv4 ; l'option peut être répétée.",
+    )
     parser.set_defaults(command_handler=run)
+
+
+def _network_configuration_from_args(
+    args: argparse.Namespace,
+) -> InitialNetworkConfiguration | None:
+    """Construire la configuration réseau initiale éventuellement demandée."""
+    requested = bool(args.network_dhcp or args.network_address)
+    if not requested:
+        if args.network_interface or args.network_gateway or args.network_dns:
+            raise NetworkProvisioningError(
+                "Choisissez --network-dhcp ou fournissez --network-address."
+            )
+        return None
+    if not args.network_interface:
+        raise NetworkProvisioningError(
+            "--network-interface est obligatoire pour configurer le réseau."
+        )
+    if args.network_dhcp:
+        if args.network_gateway or args.network_dns:
+            raise NetworkProvisioningError(
+                "La passerelle et les DNS manuels ne s'appliquent pas au mode DHCP."
+            )
+        return InitialNetworkConfiguration(
+            interface=args.network_interface,
+            method="auto",
+        )
+    if not args.network_gateway or not args.network_dns:
+        raise NetworkProvisioningError(
+            "--network-gateway et au moins un --network-dns sont requis en mode statique."
+        )
+    try:
+        address = IPv4Interface(args.network_address)
+        gateway = IPv4Address(args.network_gateway)
+        dns_servers = tuple(IPv4Address(value) for value in args.network_dns)
+    except ValueError as error:
+        raise NetworkProvisioningError(f"Configuration IPv4 initiale invalide : {error}") from error
+    return InitialNetworkConfiguration(
+        interface=args.network_interface,
+        method="manual",
+        address=address,
+        gateway=gateway,
+        dns_servers=dns_servers,
+    )
 
 
 def _display_check(check: EnvironmentCheck) -> None:
@@ -130,11 +209,32 @@ def _display_manifest(manifest: PlatformManifest) -> None:
         print(f"✓ {component.name} {component.version}")
 
 
-def _load_official_manifest(directory: Path) -> PlatformManifest:
-    """Télécharger et valider le manifeste officiel."""
+def _component_version(manifest: PlatformManifest, identifier: str) -> str:
+    """Retourner la version déclarée d'un composant obligatoire."""
+    for component in manifest.components:
+        if component.identifier == identifier:
+            return component.version
+    raise ManifestError(f"Le manifeste ne déclare pas le composant {identifier}.")
 
-    destination = directory / MANIFEST_FILENAME
-    return download_platform_manifest(destination)
+
+def _load_official_manifest(directory: Path) -> PlatformManifest:
+    """Télécharger la composition recommandée par le catalogue officiel."""
+
+    manifest, _entry = download_selected_manifest(
+        directory,
+        ReleaseSelection(),
+    )
+    return manifest
+
+
+def _load_selected_manifest(
+    directory: Path,
+    selection: ReleaseSelection,
+) -> PlatformManifest:
+    """Télécharger le manifeste d'une composition explicitement sélectionnée."""
+
+    manifest, _entry = download_selected_manifest(directory, selection)
+    return manifest
 
 
 def _download_components(
@@ -295,11 +395,18 @@ def _install_configuration_file(
     )
 
     created = not destination_path.exists()
+    migration_source = None
+
+    if created and destination_path.name == "home-assistant-telemetry.yaml":
+        legacy_path = destination_path.with_name("shelly-telemetry.yaml")
+
+        if legacy_path.is_file() and not legacy_path.is_symlink():
+            migration_source = legacy_path
 
     if created:
         try:
             shutil.copy2(
-                source_path,
+                migration_source or source_path,
                 destination_path,
             )
         except OSError as error:
@@ -499,6 +606,16 @@ def run(args: argparse.Namespace) -> int:
 
     assume_yes = bool(args.yes)
 
+    try:
+        release_selection = selection_from_args(args)
+        initial_network_configuration = _network_configuration_from_args(args)
+    except ManifestError as error:
+        print(f"✗ Sélection de version invalide : {error}")
+        return INSTALLATION_ERROR
+    except NetworkProvisioningError as error:
+        print(f"✗ Configuration réseau invalide : {error}")
+        return INSTALLATION_ERROR
+
     print("Vérification de l'environnement...")
     print()
 
@@ -515,7 +632,7 @@ def run(args: argparse.Namespace) -> int:
 
     print("L'environnement est compatible avec Ohana-Installer.")
     print()
-    print("Téléchargement du manifeste officiel...")
+    print("Téléchargement du catalogue et du manifeste officiels...")
 
     try:
         with tempfile.TemporaryDirectory(
@@ -523,12 +640,27 @@ def run(args: argparse.Namespace) -> int:
         ) as temporary_directory:
             temporary_path = Path(temporary_directory)
 
-            manifest = _load_official_manifest(temporary_path)
+            if release_selection is None:
+                manifest = _load_official_manifest(temporary_path)
+            else:
+                manifest = _load_selected_manifest(
+                    temporary_path,
+                    release_selection,
+                )
 
-            print("✓ Manifeste téléchargé et validé.")
+            print("✓ Catalogue et manifeste téléchargés et validés.")
             print()
 
             _display_manifest(manifest)
+
+            agent_version = _component_version(manifest, AGENT_IDENTIFIER)
+            if initial_network_configuration is not None and not supports_network_administration(
+                agent_version
+            ):
+                raise NetworkProvisioningError(
+                    "Le provisionnement réseau depuis Installer nécessite "
+                    "Ohana-Agent 1.11.0 ou une version ultérieure."
+                )
 
             print()
 
@@ -622,7 +754,7 @@ def run(args: argparse.Namespace) -> int:
             print()
             print("Préparation de l'administration graphique...")
 
-            administration = prepare_administration()
+            administration = prepare_administration(agent_version=agent_version)
 
             if administration.configured:
                 print("✓ Canal Agent/Vision sécurisé et configuré.")
@@ -631,6 +763,27 @@ def run(args: argparse.Namespace) -> int:
                     print("✓ Administration DHCP dnsmasq préparée.")
                 else:
                     print("✓ DHCP absent : administration DHCP désactivée.")
+
+                if administration.network_enabled:
+                    print("✓ Administration NetworkManager sécurisée.")
+
+            if initial_network_configuration is not None:
+                if not administration.network_enabled:
+                    raise NetworkProvisioningError(
+                        "NetworkManager n'est pas disponible sur cette machine."
+                    )
+                print()
+                print("Application de la configuration réseau initiale...")
+                network_state = apply_initial_network_configuration(initial_network_configuration)
+                interface = network_state.get(
+                    "interface",
+                    initial_network_configuration.interface,
+                )
+                method = network_state.get(
+                    "method",
+                    initial_network_configuration.method,
+                )
+                print(f"✓ Interface {interface} configurée en {method}.")
 
             print()
             print("Génération des services systemd...")
@@ -718,6 +871,9 @@ def run(args: argparse.Namespace) -> int:
         return INSTALLATION_ERROR
     except AdministrationPreparationError as error:
         print(f"✗ Préparation de l'administration impossible : {error}")
+        return INSTALLATION_ERROR
+    except NetworkProvisioningError as error:
+        print(f"✗ Configuration réseau impossible : {error}")
         return INSTALLATION_ERROR
     except SystemAccountError as error:
         print(f"✗ Préparation des comptes système impossible : {error}")

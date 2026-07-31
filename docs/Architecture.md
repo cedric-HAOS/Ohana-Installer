@@ -42,7 +42,8 @@ Cette séparation limite le couplage entre les projets et facilite leur évoluti
 Ohana-Installer est responsable de :
 
 * vérifier les prérequis de l'environnement ;
-* découvrir la dernière release stable d'Ohana-Platform ;
+* télécharger le catalogue officiel publié par Ohana-Platform ;
+* sélectionner et vérifier une composition Agent/Vision officielle ;
 * vérifier et télécharger les assets des releases officielles ;
 * installer les composants ;
 * générer les fichiers de configuration ;
@@ -94,12 +95,14 @@ Cette approche garantit des installations reproductibles et identiques entre les
 ## Chaîne d'intégrité
 
 La dernière release stable d'Ohana-Platform est découverte avec l'API GitHub. Son
-manifeste, après vérification de son digest SHA-256, constitue le contrat de
-composition de l'installation.
+`release-catalog.yaml`, après vérification de son digest SHA-256, liste les
+compositions installables. Chaque entrée référence une release Platform immuable.
 
-Chaque tag et chaque nom d'asset d'Ohana-Agent et d'Ohana-Vision provient de ce
-manifeste. L'asset correspondant est ensuite résolu dans la release GitHub épinglée,
-puis sa taille et son digest SHA-256 sont vérifiés avant toute écriture sur disque.
+Le `release-manifest.yaml` de la composition choisie est ensuite téléchargé et
+comparé au catalogue. Chaque tag et chaque nom d'asset d'Ohana-Agent et
+d'Ohana-Vision provient de ce manifeste. L'asset correspondant est résolu dans la
+release GitHub épinglée, puis sa taille et son digest SHA-256 sont vérifiés avant
+toute écriture sur disque.
 
 ```text
 Dernière release Installer
@@ -109,6 +112,12 @@ Mise à niveau et reprise de la commande
              │
              ▼
 Dernière release Platform
+             │
+             ▼
+Catalogue des couples Agent/Vision
+             │
+             ▼
+Release Platform sélectionnée
              │
              ▼
 Manifeste vérifié et épinglage des composants
@@ -139,17 +148,27 @@ Chaque composant reste autonome et peut évoluer indépendamment.
 
 ## Simplicité
 
-La première version du projet privilégie une approche volontairement simple.
-
-Trois commandes constituent le périmètre fonctionnel :
+L’interface interactive et les commandes explicites utilisent les mêmes fonctions
+internes. Aucun traitement d’installation, de catalogue ou de réseau n’est dupliqué.
 
 ```text
-ohana install
-ohana update
-ohana uninstall
+                    Services Installer existants
+                     ▲                       ▲
+                     │                       │
+Interface `ohana` ───┘                       └── Commandes CLI explicites
 ```
 
-Les fonctionnalités d'administration avancées seront introduites dans des versions ultérieures.
+Le menu couvre l’usage courant tandis que les commandes restent adaptées aux
+scripts et au dépannage :
+
+```text
+ohana
+ohana versions
+ohana install
+ohana update
+ohana network
+ohana uninstall
+```
 
 ---
 
@@ -178,10 +197,12 @@ Validation finale
 
 Chaque étape est validée avant de poursuivre afin de garantir une installation cohérente.
 
-La composition Platform 1.0.18 déclare les configurations DNS, NTP, MQTT,
-présence réseau, DHCP, WireGuard, Shelly Telemetry, Téléinformation et Z-Wave
-attendues par Ohana-Agent 1.8.1. Le même manifeste épingle Ohana-Vision 1.7.1
-et fournit les arguments de commande utilisés pour générer les unités systemd.
+La composition recommandée Platform 1.0.22 déclare les configurations DNS, NTP,
+MQTT, présence réseau, DHCP, WireGuard, Télémétrie Home Assistant,
+Téléinformation et Z-Wave attendues par Ohana-Agent 1.11.0. Le même manifeste
+épingle Ohana-Vision 1.10.0 et fournit les arguments utilisés pour générer les
+unités systemd. Les compositions historiques restent sélectionnables dans le
+catalogue.
 
 Pendant une mise à jour, la comparaison des versions décide uniquement quels
 packages Python doivent être remplacés. Les configurations et les unités systemd
@@ -205,7 +226,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.0.10 cible les systèmes Linux utilisant **systemd**.
+La version 1.6.0 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 
@@ -240,6 +261,43 @@ Ohana-Installer constitue le point d'entrée officiel de l'écosystème Ohana.
 Son rôle est de rendre le déploiement, la mise à jour et la désinstallation des composants aussi simples que possible, tout en laissant à chaque produit la responsabilité de son propre domaine fonctionnel.
 
 
-La composition 1.0.18 conserve la configuration Téléinformation introduite
-en 1.0.16 et épingle Vision 1.7.1 pour la validation frontend des noms DNS
+La composition 1.0.20 conserve la configuration Téléinformation introduite
+en 1.0.16 et épingle Vision 1.9.0 pour la validation frontend des noms DNS
 des réservations DHCP.
+
+
+## Lot B : flux Téléinformation direct
+
+La composition 1.0.20 conserve le flux MQTT vers Home Assistant mais ajoute un
+flux HTTP indépendant de `teleinfo2mqtt` vers le port 8770 d’Ohana-Agent. Le
+jeton d’ingestion est configuré dans Vision et dans l’add-on ; il n’accorde
+aucun droit d’administration. Les plages horaires sont enregistrées dans les
+métadonnées des équipements et restent portées par l’infrastructure Agent.
+
+
+## Administration NetworkManager
+
+Après l’installation du wheel Agent, Installer crée un wrapper root fixe vers
+`ohana-agent-network-helper` et une règle sudoers réservée à l’utilisateur
+`ohana-agent`. Agent ne reçoit aucun droit root général. Le helper accepte
+uniquement `status`, `apply`, `confirm` et `rollback`.
+
+Pendant une désinstallation, Installer confirme les transactions réseau encore
+en attente afin de conserver la connexion active, puis retire le wrapper, la
+règle sudoers et les instantanés root.
+
+
+## Interface interactive
+
+`ohana` sans argument vérifie la présence d’un terminal puis affiche un menu
+numéroté compatible avec une console locale ou une session SSH. Le menu ne lance
+aucun sous-processus `ohana` : il appelle le même parseur et les mêmes gestionnaires
+que les commandes explicites.
+
+La sélection d’une composition télécharge `release-catalog.yaml` au moment du
+choix. La liste exclut la composition recommandée, déjà couverte par le premier
+choix, et affiche les statuts supporté ou historique.
+
+Le formulaire réseau utilise le helper NetworkManager limité livré depuis le Lot C.
+L’application crée une transaction avec retour automatique ; la confirmation ou la
+restauration utilise la même transaction que Vision.

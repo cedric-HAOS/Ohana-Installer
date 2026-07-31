@@ -41,13 +41,38 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.0.10** fournit trois commandes principales :
+La version **1.6.0** fournit une interface interactive et cinq commandes explicites :
 
 ```text
+ohana
+ohana versions
 ohana install
 ohana update
+ohana network
 ohana uninstall
 ```
+
+## Interface interactive
+
+La commande la plus simple ouvre directement le menu :
+
+```bash
+sudo ohana
+```
+
+```text
+1. Installer ou mettre à jour Agent et Vision
+2. Installer une composition antérieure
+3. Configurer le réseau d’INFRA-01
+4. Quitter
+```
+
+Le premier choix installe la composition recommandée sur une machine neuve et
+met à jour une plateforme existante. Le deuxième choix charge dynamiquement le
+catalogue Platform et affiche les couples antérieurs sélectionnables. Le troisième
+modifie uniquement NetworkManager, sans télécharger ni réinstaller Agent ou Vision.
+
+Les commandes explicites restent disponibles pour les scripts et le dépannage.
 
 ## Installation
 
@@ -60,7 +85,7 @@ ohana install
 réalise automatiquement :
 
 * la vérification de l'environnement ;
-* la découverte de la dernière release stable d'Ohana-Platform ;
+* la lecture du catalogue officiel publié par Ohana-Platform ;
 * la vérification SHA-256 et le téléchargement des releases officielles ;
 * l'installation d'Ohana-Agent ;
 * l'installation d'Ohana-Vision ;
@@ -69,9 +94,83 @@ réalise automatiquement :
 * la validation finale de l'installation.
 
 Le manifeste vérifié est affiché avant toute modification. L'installation demande
-ensuite une confirmation, négative par défaut.
+ensuite une confirmation, négative par défaut. Sans sélecteur, la composition
+recommandée par la dernière release Platform est utilisée.
+
+## Choix du couple Agent/Vision
+
+Afficher les compositions déclarées par Platform :
+
+```bash
+ohana versions
+```
+
+Installer une composition par sa version Platform :
+
+```bash
+sudo ohana install --platform-version 1.0.20
+```
+
+Ou saisir directement le couple officiel :
+
+```bash
+sudo ohana install \
+  --agent-version 1.10.0 \
+  --vision-version 1.9.0
+```
+
+Installer refuse toute combinaison absente de `release-catalog.yaml`. Il ne fabrique
+jamais un couple Agent/Vision arbitraire.
 
 ---
+
+## Configuration réseau
+
+La configuration réseau peut être réalisée depuis le choix 3 du menu interactif.
+Les valeurs actives sont préremplies et le formulaire accepte un préfixe CIDR ou
+un masque décimal, par exemple `24` ou `255.255.255.0`. La nouvelle configuration
+est appliquée avec un retour automatique de 180 secondes tant qu’elle n’est pas
+confirmée. Cette opération ne déclenche aucune installation Agent/Vision.
+
+La commande explicite reste disponible :
+
+```bash
+sudo ohana network
+```
+
+Elle affiche l’état courant. Une configuration statique peut être appliquée avec :
+
+```bash
+sudo ohana network --yes \
+  --interface eth0 \
+  --address 192.168.1.10/24 \
+  --gateway 192.168.1.1 \
+  --dns 192.168.1.11 \
+  --dns 192.168.1.12
+```
+
+## Provisionnement réseau pendant l’installation
+
+Cette fonction nécessite une composition comprenant Ohana-Agent 1.11.0 ou une
+version ultérieure, soit Platform 1.0.21 ou une version ultérieure dans le
+catalogue actuel.
+
+Pour configurer INFRA-01 sans commande `nmcli` manuelle :
+
+```bash
+sudo ohana install --yes \
+  --network-interface eth0 \
+  --network-address 192.168.1.10/24 \
+  --network-gateway 192.168.1.1 \
+  --network-dns 192.168.1.11 \
+  --network-dns 192.168.1.12
+```
+
+Le mode DHCP initial est également disponible avec
+`--network-interface eth0 --network-dhcp`. L’installateur prépare le helper
+NetworkManager, valide la règle `sudoers`, applique la connexion puis confirme
+la transaction locale. Les modifications ultérieures sont disponibles dans
+Vision, page **Configuration → Réseau Agent**.
 
 ## Mise à jour
 
@@ -86,9 +185,10 @@ version plus récente existe, son wheel officiel est téléchargé, vérifié pu
 installé avec `pip --upgrade` dans le même environnement virtuel. La commande se
 relance ensuite automatiquement avec la nouvelle version.
 
-Une fois l'Installer à jour, la commande découvre la dernière release stable
-d'Ohana-Platform. Son manifeste détermine les releases exactes d'Ohana-Agent et
-d'Ohana-Vision à installer.
+Une fois l'Installer à jour, la commande utilise la composition recommandée par
+Ohana-Platform, ou la composition explicitement sélectionnée avec les mêmes options
+que `install`. Le manifeste de la release Platform choisie détermine les releases
+exactes d'Ohana-Agent et d'Ohana-Vision.
 
 L'installateur détecte les versions présentes :
 
@@ -97,8 +197,9 @@ L'installateur détecte les versions présentes :
 * les configurations manquantes et les unités systemd sont toujours
   réconciliées avec la composition Platform ;
 * les services sont redémarrés et vérifiés après cette réconciliation ;
-* si une version cible est plus ancienne, la rétrogradation automatique est refusée ;
-* sinon, le plan de mise à jour est affiché et doit être confirmé.
+* si une version cible est plus ancienne, la rétrogradation est refusée par défaut ;
+* une rétrogradation explicitement sélectionnée exige `--allow-downgrade` ;
+* le plan de mise à jour est affiché et doit être confirmé.
 
 ---
 
@@ -119,7 +220,7 @@ négative par défaut.
 
 ## Confirmations et automatisation
 
-Les trois commandes demandent une confirmation avant leur première opération
+Les commandes modificatrices demandent une confirmation avant leur première opération
 modificatrice. Une réponse vide ou négative annule sans erreur et sans modifier le
 système.
 
@@ -151,7 +252,7 @@ Il ne surveille pas l'infrastructure.
 
 Il ne collecte pas d'observations.
 
-Il ne fournit aucune interface utilisateur.
+Il ne fournit aucune interface web persistante ; son interface utilisateur reste limitée au terminal d’administration.
 
 Son unique responsabilité consiste à gérer le cycle de vie des composants officiels de l'écosystème Ohana.
 
@@ -184,27 +285,31 @@ Validation
 
 Les installations s'appuient exclusivement sur des **releases officielles**, garantissant un déploiement reproductible et indépendant des branches de développement.
 
-La release Platform agit comme contrat de composition : son manifeste épingle les
-tags et noms d'assets exacts des composants. Seule la sélection de la dernière
-release stable Platform est automatique.
+La dernière release Platform publie un catalogue des compositions disponibles.
+Chaque entrée pointe vers une release Platform immuable dont le manifeste épingle les
+tags et noms d'assets exacts des composants. Ajouter un couple au catalogue ne
+nécessite donc aucune nouvelle version de l'Installer.
 
 ---
 
 # Compatibilité
 
-La version 1.0.10 cible les environnements Linux utilisant **systemd**.
+La version 1.6.0 cible les environnements Linux utilisant **systemd**.
 
 Prérequis : **Python 3.13 ou supérieur**. Cette contrainte correspond au
 minimum commun exigé par Ohana-Agent et Ohana-Vision.
 
-La composition validée par `config/release-manifest.yaml` est :
+La composition recommandée validée par `config/release-manifest.yaml` est :
 
-* Ohana-Platform 1.0.18 ;
-* Ohana-Agent 1.8.1 ;
-* Ohana-Vision 1.7.1.
+* Ohana-Platform 1.0.22 ;
+* Ohana-Agent 1.11.0 ;
+* Ohana-Vision 1.10.0.
+
+`config/release-catalog.yaml` contient toutes les compositions officiellement
+sélectionnables par Installer 1.6.0.
 
 Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
-DHCP, WireGuard, Shelly Telemetry et Z-Wave. Le manifeste détermine également
+DHCP, WireGuard, Télémétrie Home Assistant et Z-Wave. Le manifeste détermine également
 les arguments exacts transmis aux unités systemd.
 
 ---
@@ -269,9 +374,18 @@ Ce projet est distribué sous licence **MIT**.
 Cette base reste volontairement concise et centrée sur la mission d'Ohana-Installer, en cohérence avec les README des autres projets de l'écosystème.
 
 
-## Téléinformation Linky
+## Migrations de configuration
 
-La composition 1.0.10 déploie le fichier
+Lors d’une mise à jour, une configuration locale `shelly-telemetry.yaml` est
+recopiée automatiquement vers `home-assistant-telemetry.yaml` si le nouveau
+fichier n’existe pas encore.
+
+Les compositions Platform à partir de 1.0.16 déploient le fichier
 `teleinformation.example.yaml` vers
-`/etc/ohana-agent/plugins/teleinformation.yaml` et transmet l’argument
-`--teleinformation-config` au service systemd Agent.
+`/etc/ohana-agent/plugins/teleinformation.yaml`. À partir de Platform 1.0.20,
+le profil Téléinformation prend également en charge le mode HTTP direct avec
+l’add-on `teleinfo2mqtt Ohana`.
+
+Installer conserve toujours les configurations locales existantes. Une
+composition historique ne reçoit que les fichiers et arguments déclarés par
+son propre manifeste immuable.

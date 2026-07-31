@@ -95,6 +95,33 @@ def test_install_configuration_file_creates_nested_destination(
     assert installed_file.destination_path.read_text(encoding="utf-8") == "enabled: true\n"
 
 
+def test_install_configuration_file_migrates_legacy_shelly_telemetry(
+    tmp_path: Path,
+) -> None:
+    downloaded_file = _build_downloaded_configuration(
+        tmp_path,
+        source="home-assistant-telemetry.example.yaml",
+        destination=Path("plugins/home-assistant-telemetry.yaml"),
+    )
+    configuration = downloaded_file.component.configuration
+    assert configuration is not None
+    legacy_path = configuration.directory / "plugins" / "shelly-telemetry.yaml"
+    legacy_path.parent.mkdir(parents=True)
+    legacy_path.write_text(
+        "home_assistant_url: http://ha-green.ohana.lan:8123\n"
+        "access_token_environment_variable: OLD_TOKEN\n",
+        encoding="utf-8",
+    )
+
+    installed_file = _install_configuration_file(downloaded_file)
+
+    assert installed_file.created is True
+    assert installed_file.destination_path.name == "home-assistant-telemetry.yaml"
+    assert installed_file.destination_path.read_text(encoding="utf-8") == (
+        legacy_path.read_text(encoding="utf-8")
+    )
+
+
 def test_install_configuration_file_preserves_existing_file(
     tmp_path: Path,
 ) -> None:

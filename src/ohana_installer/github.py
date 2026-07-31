@@ -20,11 +20,14 @@ from ohana_installer.manifest import (
     ConfigurationFile,
     ManifestError,
     PlatformManifest,
+    PlatformReleaseCatalog,
     load_manifest,
+    load_release_catalog,
 )
 
 DEFAULT_PLATFORM_REPOSITORY = "cedric-HAOS/Ohana-Platform"
 DEFAULT_MANIFEST_FILENAME = "release-manifest.yaml"
+DEFAULT_CATALOG_FILENAME = "release-catalog.yaml"
 DEFAULT_TIMEOUT = 15.0
 GITHUB_API_ROOT = "https://api.github.com"
 GITHUB_API_VERSION = "2022-11-28"
@@ -385,6 +388,45 @@ def download_release_asset(
         expected_size=asset.size,
         timeout=timeout,
     )
+
+
+def download_platform_catalog(
+    destination: Path | str,
+    *,
+    repository: str = DEFAULT_PLATFORM_REPOSITORY,
+    filename: str = DEFAULT_CATALOG_FILENAME,
+    timeout: float = DEFAULT_TIMEOUT,
+) -> PlatformReleaseCatalog:
+    """Télécharger et valider le catalogue officiel depuis la dernière release Platform."""
+
+    release = discover_latest_release(
+        repository,
+        timeout=timeout,
+    )
+    asset = find_release_asset(release, filename)
+    destination_path = Path(destination)
+    downloaded_path = download_release_asset(
+        asset,
+        destination_path,
+        timeout=timeout,
+    )
+
+    try:
+        catalog = load_release_catalog(downloaded_path)
+
+        if release.tag_name != f"v{catalog.platform_version}":
+            raise ManifestError(
+                "La version du catalogue Platform "
+                f"{catalog.platform_version} ne correspond pas à la release "
+                f"{release.tag_name}."
+            )
+
+        return catalog
+    except ManifestError:
+        with suppress(OSError):
+            downloaded_path.unlink(missing_ok=True)
+
+        raise
 
 
 def download_platform_manifest(

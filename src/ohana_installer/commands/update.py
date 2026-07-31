@@ -26,6 +26,7 @@ from ohana_installer.commands.install import (
     VISION_IDENTIFIER,
     ConfigurationInstallationError,
     _check_services,
+    _component_version,
     _display_check,
     _display_manifest,
     _download_components,
@@ -37,6 +38,7 @@ from ohana_installer.commands.install import (
     _install_configurations,
     _install_vision,
     _load_official_manifest,
+    _load_selected_manifest,
     _reload_systemd,
     _start_services,
 )
@@ -60,6 +62,12 @@ from ohana_installer.python_package import (
     inspect_installed_component,
     upgrade_wheel,
     verify_component_command,
+)
+from ohana_installer.release_selection import (
+    ReleaseSelection,
+    add_release_selection_arguments,
+    release_selection_arguments,
+    selection_from_args,
 )
 from ohana_installer.system_account import SystemAccountError
 from ohana_installer.systemd import (
@@ -103,6 +111,15 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
         "--yes",
         action="store_true",
         help="Accepter automatiquement les confirmations.",
+    )
+    add_release_selection_arguments(parser)
+    parser.add_argument(
+        "--allow-downgrade",
+        action="store_true",
+        help=(
+            "Autoriser explicitement l'installation d'un couple plus ancien "
+            "que les versions actuellement installées."
+        ),
     )
     parser.set_defaults(command_handler=run)
 
@@ -317,7 +334,12 @@ def _prepare_installer_update(
     return "updated"
 
 
-def _restart_update(*, assume_yes: bool) -> NoReturn:
+def _restart_update(
+    *,
+    assume_yes: bool,
+    selection: ReleaseSelection | None = None,
+    allow_downgrade: bool = False,
+) -> NoReturn:
     """Reprendre la commande avec la nouvelle version de l'Installer."""
 
     arguments = [
@@ -330,6 +352,11 @@ def _restart_update(*, assume_yes: bool) -> NoReturn:
     if assume_yes:
         arguments.append("--yes")
 
+    arguments.extend(release_selection_arguments(selection))
+
+    if allow_downgrade:
+        arguments.append("--allow-downgrade")
+
     print("Reprise de la mise à jour avec la nouvelle version...")
     os.execv(sys.executable, arguments)
 
@@ -340,8 +367,13 @@ def _reject_downgrades(
         str,
         InstalledPythonComponent | None,
     ],
+    *,
+    allow_downgrade: bool = False,
 ) -> None:
-    """Refuser une régression de version implicite."""
+    """Refuser une régression qui n'a pas été explicitement autorisée."""
+
+    if allow_downgrade:
+        return
 
     for component in manifest.components:
         installed_component = installed_components[component.identifier]
@@ -361,7 +393,8 @@ def _reject_downgrades(
                 f"La release Platform cible {component.name} "
                 f"{component.version}, plus ancien que la version "
                 f"installée {installed_component.version}. "
-                "La rétrogradation automatique est refusée."
+                "Utilisez --allow-downgrade pour confirmer explicitement "
+                "cette rétrogradation."
             )
 
 
@@ -369,6 +402,17 @@ def run(args: argparse.Namespace) -> int:
     """Exécuter la commande update."""
 
     assume_yes = bool(args.yes)
+    allow_downgrade = bool(args.allow_downgrade)
+
+    try:
+        release_selection = selection_from_args(args)
+        if allow_downgrade and release_selection is None:
+            raise ManifestError(
+                "--allow-downgrade exige une version Platform ou un couple Agent/Vision explicite."
+            )
+    except ManifestError as error:
+        print(f"✗ Sélection de version invalide : {error}")
+        return UPDATE_ERROR
 
     print("Vérification de l'environnement...")
     print()
@@ -400,19 +444,29 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
         if installer_update == "updated":
-            _restart_update(assume_yes=assume_yes)
+            _restart_update(
+                assume_yes=assume_yes,
+                selection=release_selection,
+                allow_downgrade=allow_downgrade,
+            )
 
         print()
-        print("Téléchargement du manifeste officiel...")
+        print("Téléchargement du catalogue et du manifeste officiels...")
 
         with tempfile.TemporaryDirectory(
             prefix="ohana-installer-update-",
         ) as temporary_directory:
             temporary_path = Path(temporary_directory)
 
-            manifest = _load_official_manifest(temporary_path)
+            if release_selection is None:
+                manifest = _load_official_manifest(temporary_path)
+            else:
+                manifest = _load_selected_manifest(
+                    temporary_path,
+                    release_selection,
+                )
 
-            print("✓ Manifeste téléchargé et validé.")
+            print("✓ Catalogue et manifeste téléchargés et validés.")
             print()
 
             _display_manifest(manifest)
@@ -444,6 +498,7 @@ def run(args: argparse.Namespace) -> int:
             _reject_downgrades(
                 manifest,
                 installed_components,
+                allow_downgrade=allow_downgrade,
             )
 
             components_to_update = _components_requiring_update(
@@ -547,19 +602,6 @@ def run(args: argparse.Namespace) -> int:
                     )
 
             print()
-            print("Préparation de l'administration graphique...")
-
-            administration = prepare_administration()
-
-            if administration.configured:
-                print("✓ Canal Agent/Vision sécurisé et configuré.")
-
-                if administration.dhcp_enabled:
-                    print("✓ Administration DHCP dnsmasq préparée.")
-                else:
-                    print("✓ DHCP absent : administration DHCP désactivée.")
-
-            print()
             print("Arrêt des services systemd...")
 
             _stop_services(generated_services)
@@ -588,6 +630,23 @@ def run(args: argparse.Namespace) -> int:
                 )
 
                 print(f"✓ {installed_vision.name} {installed_vision.version} mis à jour.")
+
+            print()
+            print("Préparation de l'administration graphique...")
+
+            agent_version = _component_version(manifest, AGENT_IDENTIFIER)
+            administration = prepare_administration(agent_version=agent_version)
+
+            if administration.configured:
+                print("✓ Canal Agent/Vision sécurisé et configuré.")
+
+                if administration.dhcp_enabled:
+                    print("✓ Administration DHCP dnsmasq préparée.")
+                else:
+                    print("✓ DHCP absent : administration DHCP désactivée.")
+
+                if administration.network_enabled:
+                    print("✓ Administration NetworkManager sécurisée.")
 
             print()
             print("Mise à jour des services systemd...")

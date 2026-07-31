@@ -6,6 +6,113 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.6.0] — Interface interactive — 2026-07-30
+
+## Ajouté
+
+- Ouverture directe du menu interactif avec `ohana` sans argument.
+- Installation ou mise à jour automatique de la composition recommandée.
+- Liste sélectionnable des compositions antérieures publiées par Platform.
+- Formulaire réseau prérempli pour l’adresse, le masque, la passerelle et les DNS.
+- Commande autonome `ohana network` pour lire ou modifier NetworkManager sans
+  installer Agent ou Vision.
+- Acceptation des masques IPv4 en notation CIDR ou décimale dans le formulaire.
+
+## Sécurité
+
+- Retour automatique NetworkManager après 180 secondes sans confirmation.
+- Confirmation supplémentaire avant une composition historique ou une
+  rétrogradation.
+- Conservation intégrale des commandes CLI pour les scripts et le dépannage.
+
+## Qualité
+
+- Interface sans dépendance graphique supplémentaire, adaptée au terminal local et à SSH.
+- 242 tests réussis.
+
+---
+
+# [1.5.0] — Catalogue des couples Agent/Vision — 2026-07-30
+
+## Ajouté
+
+- Commande `ohana versions` listant les compositions publiées par Ohana-Platform.
+- Sélection d’une composition avec `--platform-version`.
+- Sélection directe d’un couple officiel avec `--agent-version` et
+  `--vision-version`.
+- Téléchargement du manifeste immuable de la release Platform correspondant au
+  couple choisi.
+- Option `--allow-downgrade` pour une rétrogradation explicitement sélectionnée.
+
+## Sécurité
+
+- Refus de tout couple Agent/Vision absent du catalogue officiel.
+- Vérification de concordance entre le catalogue, la release Platform et son
+  manifeste avant le téléchargement des composants.
+- Conservation des sélecteurs de version après l’auto-mise à jour de l’Installer.
+
+## Modifié
+
+- Composition recommandée alignée sur Ohana-Platform 1.0.22, Ohana-Agent 1.11.0
+  et Ohana-Vision 1.10.0.
+
+## Qualité
+
+- 230 tests réussis.
+
+---
+
+# [1.0.13] — Déploiement du Lot C — 2026-07-30
+
+## Ajouté
+
+- Préparation du helper NetworkManager privilégié et d’une règle `sudoers`
+  strictement limitée à ce helper.
+- Provisionnement IPv4 initial facultatif avec `--network-interface`,
+  `--network-address`, `--network-gateway` et `--network-dns`, ou mode DHCP.
+- Activation automatique de l’administration réseau Agent lorsque
+  NetworkManager et le helper installé sont disponibles.
+
+## Modifié
+
+- Composition alignée sur Ohana-Platform 1.0.21, Ohana-Agent 1.11.0 et
+  Ohana-Vision 1.10.0.
+
+## Qualité
+
+- Validation du sous-réseau, de la passerelle et des DNS avant application.
+- Vérification de la règle `sudoers` avec `visudo` lorsqu’il est disponible.
+
+---
+
+# [1.0.12] — Déploiement du Lot B — 2026-07-30
+
+## Modifié
+
+- Composition alignée sur Ohana-Platform 1.0.20, Ohana-Agent 1.10.0 et
+  Ohana-Vision 1.9.0.
+- Déploiement du profil Téléinformation comprenant le mode HTTP direct vers
+  Agent et maintien de la configuration historique lors d’une mise à jour.
+- Conservation des métadonnées de plages horaires dans le fichier
+  d’infrastructure administré par Agent.
+
+## Compatibilité
+
+- Les configurations locales Téléinformation existantes ne sont pas écrasées.
+- Une nouvelle installation déploie le plugin direct désactivé jusqu’à la
+  définition du jeton commun avec l’add-on `teleinfo2mqtt Ohana`.
+
+---
+
+# [1.0.11] — Déploiement du Lot A — 2026-07-30
+
+## Modifié
+
+- Manifestes Agent 1.9.0 et Vision 1.8.0.
+- Migration automatique de `shelly-telemetry.yaml` vers `home-assistant-telemetry.yaml`.
+
+---
+
 # [1.0.10] - 2026-07-29
 
 ## Modifié

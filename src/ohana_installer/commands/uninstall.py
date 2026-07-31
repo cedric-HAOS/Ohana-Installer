@@ -11,6 +11,13 @@ from ohana_installer.commands.install import (
     VISION_INSTALLATION_PATH,
 )
 from ohana_installer.confirmation import confirm_action
+from ohana_installer.network import (
+    NETWORK_HELPER_PATH,
+    NETWORK_STATE_DIRECTORY,
+    NETWORK_SUDOERS_PATH,
+    NetworkProvisioningError,
+    remove_network_administration,
+)
 from ohana_installer.systemd import (
     SYSTEMD_SYSTEM_DIRECTORY,
     SystemdCommandError,
@@ -97,8 +104,16 @@ def run(args: argparse.Namespace) -> int:
             service_name for service_name in SERVICE_NAMES if _service_is_installed(service_name)
         )
         existing_paths = tuple(path for path in INSTALLATION_PATHS if path.exists())
+        network_administration_exists = any(
+            path.exists()
+            for path in (
+                NETWORK_HELPER_PATH,
+                NETWORK_SUDOERS_PATH,
+                NETWORK_STATE_DIRECTORY,
+            )
+        )
 
-        if not installed_services and not existing_paths:
+        if not installed_services and not existing_paths and not network_administration_exists:
             print("✓ Aucune installation Ohana détectée.")
             return 0
 
@@ -152,6 +167,14 @@ def run(args: argparse.Namespace) -> int:
             print("✓ Aucun service systemd Ohana installé.")
 
         print()
+        print("Suppression de l administration réseau privilégiée...")
+
+        if remove_network_administration():
+            print("✓ Helper NetworkManager et règle sudoers supprimés.")
+        else:
+            print("✓ Administration réseau déjà absente.")
+
+        print()
         print("Suppression des composants...")
 
         for installation_path in INSTALLATION_PATHS:
@@ -168,7 +191,7 @@ def run(args: argparse.Namespace) -> int:
     except SystemdInstallationError as error:
         print(f"✗ Suppression systemd impossible : {error}")
         return UNINSTALLATION_ERROR
-    except UninstallationError as error:
+    except (UninstallationError, NetworkProvisioningError) as error:
         print(f"✗ Désinstallation impossible : {error}")
         return UNINSTALLATION_ERROR
 

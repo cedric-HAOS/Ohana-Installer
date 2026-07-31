@@ -26,6 +26,7 @@ from ohana_installer.github import (
     download_component_packages,
     download_configuration_files,
     download_file,
+    download_platform_catalog,
     download_platform_manifest,
     find_release_asset,
     get_release_by_tag,
@@ -37,6 +38,23 @@ from ohana_installer.manifest import (
     ConfigurationFile,
     ManifestError,
 )
+
+VALID_CATALOG_CONTENT = b"""
+schema_version: 1
+
+platform:
+  name: Ohana
+  version: "1.0.22"
+
+default_platform_version: "1.0.22"
+
+releases:
+  - platform_version: "1.0.22"
+    release_tag: v1.0.22
+    agent_version: "1.11.0"
+    vision_version: "1.10.0"
+    status: recommended
+"""
 
 VALID_MANIFEST_CONTENT = b"""
 schema_version: 1
@@ -489,6 +507,69 @@ def test_download_file_stops_after_transient_http_retries(
         )
 
     assert attempts == 3
+
+
+def test_download_platform_catalog_discovers_latest_and_verifies(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    asset = _asset_payload(
+        "release-catalog.yaml",
+        VALID_CATALOG_CONTENT,
+    )
+    payload = _release_payload(
+        tag_name="v1.0.22",
+        assets=[asset],
+    )
+
+    def fake_urlopen(request, timeout):
+        if request.full_url.endswith("/releases/latest"):
+            return _response(json.dumps(payload).encode())
+
+        return _response(VALID_CATALOG_CONTENT)
+
+    monkeypatch.setattr(
+        "ohana_installer.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    destination = tmp_path / "release-catalog.yaml"
+
+    catalog = download_platform_catalog(destination)
+
+    assert catalog.platform_version == "1.0.22"
+    assert catalog.default_platform_version == "1.0.22"
+    assert destination.read_bytes() == VALID_CATALOG_CONTENT
+
+
+def test_download_platform_catalog_rejects_release_version_mismatch(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    asset = _asset_payload(
+        "release-catalog.yaml",
+        VALID_CATALOG_CONTENT,
+    )
+    payload = _release_payload(
+        tag_name="v9.9.9",
+        assets=[asset],
+    )
+
+    def fake_urlopen(request, timeout):
+        if request.full_url.endswith("/releases/latest"):
+            return _response(json.dumps(payload).encode())
+
+        return _response(VALID_CATALOG_CONTENT)
+
+    monkeypatch.setattr(
+        "ohana_installer.github.urllib.request.urlopen",
+        fake_urlopen,
+    )
+    destination = tmp_path / "release-catalog.yaml"
+
+    with pytest.raises(ManifestError, match="ne correspond pas à la release"):
+        download_platform_catalog(destination)
+
+    assert not destination.exists()
 
 
 def test_download_platform_manifest_discovers_latest_and_verifies(
