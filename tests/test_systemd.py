@@ -509,7 +509,7 @@ def test_render_systemd_service() -> None:
         "--mqtt-config /etc/ohana-agent/plugins/mqtt.yaml"
     ) in content
     assert "Restart=on-failure" in content
-    assert "NoNewPrivileges=true" in content
+    assert "NoNewPrivileges=false" in content
     assert "WantedBy=multi-user.target" in content
     assert content.endswith("\n")
 

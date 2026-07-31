@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from ohana_installer.administration import (
+    DHCP_RELOAD_HELPER_PATH,
     DHCP_RELOAD_PATH_NAME,
     AdministrationPreparation,
     activate_administration,
@@ -114,6 +115,38 @@ def test_prepare_administration_configures_dnsmasq_once(
     assert "PathChanged=/run/ohana-agent/dhcp-reload.request" in (
         systemd_directory / "ohana-dhcp-reload.path"
     ).read_text(encoding="utf-8")
+    reload_service = (systemd_directory / "ohana-dhcp-reload.service").read_text(encoding="utf-8")
+    assert f"ExecStart={DHCP_RELOAD_HELPER_PATH}" in reload_service
+    assert "ReadWritePaths=/var/lib/misc" in reload_service
+
+
+def test_prepare_administration_keeps_legacy_reload_for_agent_1_11_0(
+    tmp_path: Path,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    dnsmasq = tmp_path / "dnsmasq"
+    dnsmasq.touch()
+    dnsmasq_directory = tmp_path / "dnsmasq.d"
+    dnsmasq_directory.mkdir()
+    systemd_directory = tmp_path / "systemd"
+
+    prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=dnsmasq,
+        dnsmasq_configuration_directory=dnsmasq_directory,
+        systemd_directory=systemd_directory,
+        require_linux=False,
+        secure_ownership=False,
+        agent_version="1.11.0",
+    )
+
+    reload_service = (systemd_directory / "ohana-dhcp-reload.service").read_text(encoding="utf-8")
+    assert "systemctl reload-or-restart dnsmasq.service" in reload_service
+    assert str(DHCP_RELOAD_HELPER_PATH) not in reload_service
 
 
 def test_prepare_administration_migrates_legacy_dnsmasq_name(

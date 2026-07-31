@@ -197,9 +197,9 @@ Validation finale
 
 Chaque étape est validée avant de poursuivre afin de garantir une installation cohérente.
 
-La composition recommandée Platform 1.0.22 déclare les configurations DNS, NTP,
+La composition recommandée Platform 1.0.23 déclare les configurations DNS, NTP,
 MQTT, présence réseau, DHCP, WireGuard, Télémétrie Home Assistant,
-Téléinformation et Z-Wave attendues par Ohana-Agent 1.11.0. Le même manifeste
+Téléinformation et Z-Wave attendues par Ohana-Agent 1.11.1. Le même manifeste
 épingle Ohana-Vision 1.10.0 et fournit les arguments utilisés pour générer les
 unités systemd. Les compositions historiques restent sélectionnables dans le
 catalogue.
@@ -226,7 +226,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.6.0 cible les systèmes Linux utilisant **systemd**.
+La version 1.6.1 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 

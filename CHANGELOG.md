@@ -6,6 +6,32 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.6.1] — Application fiable des réservations DHCP — 2026-07-31
+
+## Corrigé
+
+- Déploiement du helper `ohana-agent-dhcp-reload-helper` fourni par
+  Ohana-Agent 1.11.1 afin de supprimer uniquement les anciens baux incompatibles
+  avec une réservation nouvelle ou modifiée.
+- Conservation de l’ancien rechargement dnsmasq pour les compositions
+  historiques utilisant Ohana-Agent 1.11.0.
+- Unité `ohana-agent.service` compatible avec l’appel du helper NetworkManager
+  restreint par sudo.
+
+## Modifié
+
+- Composition recommandée alignée sur Ohana-Platform 1.0.23,
+  Ohana-Agent 1.11.1 et Ohana-Vision 1.10.0.
+- Retrait du catalogue des versions Platform qui ne possèdent aucune release
+  GitHub téléchargeable.
+
+## Qualité
+
+- Validation des unités systemd modernes et historiques.
+- 243 tests réussis.
+
+---
+
 # [1.6.0] — Interface interactive — 2026-07-30
 
 ## Ajouté

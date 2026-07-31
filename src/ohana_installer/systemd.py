@@ -178,7 +178,11 @@ def render_systemd_service(
         [
             "Restart=on-failure",
             "RestartSec=5",
-            "NoNewPrivileges=true",
+            (
+                "NoNewPrivileges=false"
+                if service.filename == "ohana-agent.service"
+                else "NoNewPrivileges=true"
+            ),
             "",
             "[Install]",
             "WantedBy=multi-user.target",

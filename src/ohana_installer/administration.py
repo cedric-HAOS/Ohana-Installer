@@ -52,7 +52,9 @@ DNSMASQ_MANAGED_FILES = (
 SYSTEMD_SYSTEM_DIRECTORY = Path("/etc/systemd/system")
 DHCP_RELOAD_SERVICE_NAME = "ohana-dhcp-reload.service"
 DHCP_RELOAD_PATH_NAME = "ohana-dhcp-reload.path"
+DHCP_RELOAD_HELPER_PATH = Path("/opt/ohana-agent/venv/bin/ohana-agent-dhcp-reload-helper")
 NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
+DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 
 
 class AdministrationPreparationError(RuntimeError):
@@ -129,6 +131,7 @@ def prepare_administration(
     )
 
     network_supported = supports_network_administration(agent_version)
+    dhcp_lease_purge_supported = supports_dhcp_lease_purge(agent_version)
 
     _append_section_if_missing(
         agent_configuration_path,
@@ -199,6 +202,7 @@ def prepare_administration(
         )
         installed_units = _install_reload_units(
             systemd_directory,
+            purge_stale_leases=dhcp_lease_purge_supported,
         )
 
     return AdministrationPreparation(
@@ -374,6 +378,25 @@ def _ensure_agent_network_section(
 
 def supports_network_administration(agent_version: str | None) -> bool:
     """Indiquer si la version Agent comprend le contrat NetworkManager du Lot C."""
+    return _supports_agent_version(
+        agent_version,
+        minimum=NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION,
+    )
+
+
+def supports_dhcp_lease_purge(agent_version: str | None) -> bool:
+    """Indiquer si Agent fournit le helper de purge ciblée des baux DHCP."""
+    return _supports_agent_version(
+        agent_version,
+        minimum=DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION,
+    )
+
+
+def _supports_agent_version(
+    agent_version: str | None,
+    *,
+    minimum: tuple[int, int, int],
+) -> bool:
     if agent_version is None:
         return True
     try:
@@ -384,7 +407,7 @@ def supports_network_administration(agent_version: str | None) -> bool:
         ) from error
     if len(parts) != 3:
         raise AdministrationPreparationError(f"Version Ohana-Agent invalide : {agent_version}.")
-    return parts >= NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION
+    return parts >= minimum
 
 
 def _remove_agent_network_section(path: Path) -> None:
@@ -520,6 +543,8 @@ def _secure_mutable_path(
 
 def _install_reload_units(
     systemd_directory: Path,
+    *,
+    purge_stale_leases: bool,
 ) -> tuple[Path, ...]:
     systemd_directory.mkdir(
         parents=True,
@@ -528,7 +553,7 @@ def _install_reload_units(
     service_path = systemd_directory / DHCP_RELOAD_SERVICE_NAME
     path_unit_path = systemd_directory / DHCP_RELOAD_PATH_NAME
     service_path.write_text(
-        _reload_service_content(),
+        _reload_service_content(purge_stale_leases=purge_stale_leases),
         encoding="utf-8",
         newline="\n",
     )
@@ -546,22 +571,31 @@ def _install_reload_units(
     )
 
 
-def _reload_service_content() -> str:
-    return "\n".join(
-        [
-            "[Unit]",
-            "Description=Reload dnsmasq after an Ohana DHCP update",
-            "After=dnsmasq.service",
-            "",
-            "[Service]",
-            "Type=oneshot",
-            ("ExecStart=/usr/bin/systemctl reload-or-restart dnsmasq.service"),
-            "NoNewPrivileges=true",
-            "ProtectSystem=strict",
-            "ProtectHome=true",
-            "",
-        ]
-    )
+def _reload_service_content(*, purge_stale_leases: bool) -> str:
+    lines = [
+        "[Unit]",
+        "Description=Apply an Ohana DHCP update",
+        "After=dnsmasq.service",
+        "",
+        "[Service]",
+        "Type=oneshot",
+    ]
+
+    if purge_stale_leases:
+        lines.extend(
+            [
+                f"ExecStart={DHCP_RELOAD_HELPER_PATH}",
+                "NoNewPrivileges=true",
+                "ProtectSystem=strict",
+                "ProtectHome=true",
+                "PrivateTmp=true",
+                "ReadWritePaths=/var/lib/misc",
+            ]
+        )
+    else:
+        lines.append("ExecStart=/usr/bin/systemctl reload-or-restart dnsmasq.service")
+
+    return "\n".join([*lines, ""])
 
 
 def _reload_path_content() -> str:

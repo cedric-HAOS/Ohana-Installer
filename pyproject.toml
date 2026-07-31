@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "ohana-installer"
-version = "1.6.0"
+version = "1.6.1"
 description = "Installateur officiel de l'écosystème Ohana"
 readme = "README.md"
 requires-python = ">=3.13"

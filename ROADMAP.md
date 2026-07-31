@@ -6,6 +6,15 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.6.1 — Fiabilité DHCP
+
+**Statut : terminée.**
+
+* [x] Déployer le helper de purge ciblée fourni par Ohana-Agent 1.11.1.
+* [x] Conserver le rechargement historique pour Ohana-Agent 1.11.0.
+* [x] Aligner le catalogue sur Ohana-Platform 1.0.23.
+* [x] Publier les artefacts wheel, sdist et SHA256SUMS.
+
 # Version 1.6.0 — Interface interactive finale
 
 ## 1. Menu principal
