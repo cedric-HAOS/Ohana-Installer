@@ -226,7 +226,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.6.1 cible les systèmes Linux utilisant **systemd**.
+La version 1.7.0 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 
@@ -301,3 +301,9 @@ choix, et affiche les statuts supporté ou historique.
 Le formulaire réseau utilise le helper NetworkManager limité livré depuis le Lot C.
 L’application crée une transaction avec retour automatique ; la confirmation ou la
 restauration utilise la même transaction que Vision.
+
+La mise à jour automatique installe `ohana-update.service` et
+`ohana-update.timer` dans `/etc/systemd/system`. Le timer est persistant,
+quotidien et temporisé aléatoirement. Il appelle `ohana update --yes --if-needed` :
+le mode `--if-needed` conserve l'auto-mise à jour d'Installer, mais termine avant
+toute réconciliation et tout redémarrage si Agent et Vision sont déjà courants.

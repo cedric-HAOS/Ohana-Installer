@@ -6,7 +6,7 @@ import argparse
 import sys
 from collections.abc import Sequence
 
-from ohana_installer.commands import install, network, uninstall, update, versions
+from ohana_installer.commands import automatic_update, install, network, uninstall, update, versions
 from ohana_installer.interactive import run as run_interactive
 from ohana_installer.version import __version__
 
@@ -31,7 +31,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(
         dest="command",
         title="commandes",
-        metavar="{install,update,uninstall,versions,network}",
+        metavar="{install,update,uninstall,versions,network,automatic-update}",
     )
 
     install.configure_parser(subparsers)
@@ -39,6 +39,7 @@ def build_parser() -> argparse.ArgumentParser:
     uninstall.configure_parser(subparsers)
     versions.configure_parser(subparsers)
     network.configure_parser(subparsers)
+    automatic_update.configure_parser(subparsers)
 
     return parser
 

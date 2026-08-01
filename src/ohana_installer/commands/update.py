@@ -112,6 +112,14 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Accepter automatiquement les confirmations.",
     )
+    parser.add_argument(
+        "--if-needed",
+        action="store_true",
+        help=(
+            "Ne rien modifier lorsque l'Installer, Agent et Vision utilisent "
+            "déjà les dernières versions officielles."
+        ),
+    )
     add_release_selection_arguments(parser)
     parser.add_argument(
         "--allow-downgrade",
@@ -337,6 +345,7 @@ def _prepare_installer_update(
 def _restart_update(
     *,
     assume_yes: bool,
+    if_needed: bool = False,
     selection: ReleaseSelection | None = None,
     allow_downgrade: bool = False,
 ) -> NoReturn:
@@ -351,6 +360,9 @@ def _restart_update(
 
     if assume_yes:
         arguments.append("--yes")
+
+    if if_needed:
+        arguments.append("--if-needed")
 
     arguments.extend(release_selection_arguments(selection))
 
@@ -402,6 +414,7 @@ def run(args: argparse.Namespace) -> int:
     """Exécuter la commande update."""
 
     assume_yes = bool(args.yes)
+    if_needed = bool(args.if_needed)
     allow_downgrade = bool(args.allow_downgrade)
 
     try:
@@ -446,6 +459,7 @@ def run(args: argparse.Namespace) -> int:
         if installer_update == "updated":
             _restart_update(
                 assume_yes=assume_yes,
+                if_needed=if_needed,
                 selection=release_selection,
                 allow_downgrade=allow_downgrade,
             )
@@ -483,6 +497,12 @@ def run(args: argparse.Namespace) -> int:
                 manifest,
                 installed_components,
             )
+
+            if versions_are_current and if_needed:
+                print()
+                print("✓ Ohana-Installer, Ohana-Agent et Ohana-Vision sont déjà à jour.")
+                print("Aucun service n'a été redémarré.")
+                return 0
 
             if versions_are_current:
                 print()

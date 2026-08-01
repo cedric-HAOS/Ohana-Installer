@@ -6,6 +6,17 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.7.0 — Mise à jour automatique
+
+**Statut : terminée.**
+
+* [x] Ajouter une option dédiée au menu interactif.
+* [x] Fournir `automatic-update enable|disable|status`.
+* [x] Installer un timer systemd quotidien, persistant et aléatoirement décalé.
+* [x] Éviter toute interruption lorsque les versions sont déjà courantes.
+* [x] Supprimer les unités automatiques pendant la désinstallation.
+* [x] Publier les artefacts wheel, sdist et SHA256SUMS.
+
 # Version 1.6.1 — Fiabilité DHCP
 
 **Statut : terminée.**

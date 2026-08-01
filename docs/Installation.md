@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.6.1**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.7.0**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée
@@ -47,15 +47,15 @@ sudo reboot
 ## 3. Télécharger la release officielle
 
 ```bash
-mkdir -p "$HOME/ohana-installer-1.6.1"
-cd "$HOME/ohana-installer-1.6.1"
+mkdir -p "$HOME/ohana-installer-1.7.0"
+cd "$HOME/ohana-installer-1.7.0"
 
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.6.1/ohana_installer-1.6.1-py3-none-any.whl
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.7.0/ohana_installer-1.7.0-py3-none-any.whl
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.6.1/ohana_installer-1.6.1.tar.gz
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.7.0/ohana_installer-1.7.0.tar.gz
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.6.1/SHA256SUMS
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.7.0/SHA256SUMS
 ```
 
 ## 4. Vérifier les artefacts
@@ -75,7 +75,7 @@ Raspberry Pi OS.
 ```bash
 sudo python3.13 -m venv /opt/ohana-installer
 sudo /opt/ohana-installer/bin/python -m pip install \
-  ./ohana_installer-1.6.1-py3-none-any.whl
+  ./ohana_installer-1.7.0-py3-none-any.whl
 sudo ln -sfn /opt/ohana-installer/bin/ohana /usr/local/bin/ohana
 ```
 
@@ -88,7 +88,7 @@ ohana --version
 Résultat attendu :
 
 ```text
-ohana 1.6.1
+ohana 1.7.0
 ```
 
 ## 6. Ouvrir Ohana-Installer
@@ -103,7 +103,8 @@ Le menu propose :
 1. Installer ou mettre à jour Agent et Vision
 2. Installer une composition antérieure
 3. Configurer le réseau d’INFRA-01
-4. Quitter
+4. Mise à jour automatique : désactivée
+5. Quitter
 ```
 
 Choisir **1** pour une installation neuve ou une mise à jour vers la composition
@@ -112,6 +113,7 @@ recommandée. Les commandes explicites restent disponibles, notamment :
 ```bash
 sudo ohana install
 sudo ohana update
+sudo ohana automatic-update enable
 ```
 
 L'installateur :

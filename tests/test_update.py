@@ -213,7 +213,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    release = _installer_release("1.6.2")
+    release = _installer_release("1.7.1")
     operations: list[str] = []
 
     monkeypatch.setattr(
@@ -249,7 +249,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
         "verify_component_command",
         lambda **kwargs: InstalledPythonComponent(
             name="Ohana-Installer",
-            version="1.6.2",
+            version="1.7.1",
             environment_path=Path(sys.prefix),
             executable_path=Path(sys.prefix) / "bin" / "ohana",
         ),
@@ -262,12 +262,12 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
 
     assert result == "updated"
     assert operations == [
-        "download:ohana_installer-1.6.2-py3-none-any.whl",
-        (f"upgrade:ohana_installer-1.6.2-py3-none-any.whl:{sys.executable}"),
+        "download:ohana_installer-1.7.1-py3-none-any.whl",
+        (f"upgrade:ohana_installer-1.7.1-py3-none-any.whl:{sys.executable}"),
     ]
     output = capsys.readouterr().out
-    assert "1.6.2 téléchargé et vérifié" in output
-    assert "1.6.2 mis à jour" in output
+    assert "1.7.1 téléchargé et vérifié" in output
+    assert "1.7.1 mis à jour" in output
 
 
 def test_installer_self_update_can_be_declined(
@@ -277,7 +277,7 @@ def test_installer_self_update_can_be_declined(
     monkeypatch.setattr(
         update_command,
         "discover_latest_release",
-        lambda repository: _installer_release("1.6.2"),
+        lambda repository: _installer_release("1.7.1"),
     )
     monkeypatch.setattr(
         update_command,
@@ -307,7 +307,7 @@ def test_installer_self_update_requires_one_wheel(
         update_command,
         "discover_latest_release",
         lambda repository: _installer_release(
-            "1.6.2",
+            "1.7.1",
             include_wheel=False,
         ),
     )
@@ -1027,6 +1027,42 @@ def test_update_reconciles_platform_when_installed_versions_are_current(
     assert "Aucun package Python à télécharger" in output
     assert "composition Platform va néanmoins être réconciliée" in output
     assert "Composition Ohana Platform réconciliée" in output
+
+
+def test_automatic_update_does_not_restart_current_services(
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    manifest = _build_manifest()
+    monkeypatch.setattr(
+        "ohana_installer.commands.update.run_environment_checks",
+        lambda: (EnvironmentCheck(name="Linux", success=True, message="Compatible."),),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._load_official_manifest",
+        lambda _directory: manifest,
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update.inspect_installed_component",
+        lambda **kwargs: InstalledPythonComponent(
+            name=kwargs["component_name"],
+            version="1.1.0",
+            environment_path=Path("/opt/ohana/venv"),
+            executable_path=Path("/opt/ohana/venv/bin/ohana"),
+        ),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update.confirm_action",
+        lambda *_args, **_kwargs: pytest.fail("Aucune confirmation ne doit etre demandee."),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update._download_configurations",
+        lambda *_args: pytest.fail("Aucune configuration ne doit etre telechargee."),
+    )
+
+    assert main(["update", "--yes", "--if-needed"]) == 0
+    output = capsys.readouterr().out
+    assert "Aucun service n'a été redémarré" in output
 
 
 def test_update_refuses_automatic_downgrade(

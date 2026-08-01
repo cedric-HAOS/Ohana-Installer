@@ -11,6 +11,12 @@ from ipaddress import IPv4Address, IPv4Interface, IPv4Network
 from pathlib import Path
 from typing import TextIO
 
+from ohana_installer.commands.automatic_update import (
+    AutomaticUpdateError,
+)
+from ohana_installer.commands.automatic_update import (
+    is_enabled as automatic_update_is_enabled,
+)
 from ohana_installer.commands.install import (
     AGENT_COMMAND_NAME,
     AGENT_ENVIRONMENT_PATH,
@@ -135,11 +141,16 @@ def _render_main_menu(output: TextIO, status: InstalledStatus) -> None:
     _write(output, f"│{'  Agent installé : ' + agent:<70}│")
     _write(output, f"│{'  Vision installée : ' + vision:<70}│")
     _write(output, "├" + "─" * (width - 2) + "┤")
+    try:
+        automatic_update = "activée" if automatic_update_is_enabled() else "désactivée"
+    except AutomaticUpdateError:
+        automatic_update = "indisponible"
     for line in (
         "  1. Installer ou mettre à jour Agent et Vision",
         "  2. Installer une composition antérieure",
         "  3. Configurer le réseau d INFRA-01",
-        "  4. Quitter",
+        f"  4. Mise à jour automatique : {automatic_update}",
+        "  5. Quitter",
     ):
         _write(output, f"│{line:<70}│")
     _write(output, "└" + "─" * (width - 2) + "┘")
@@ -465,7 +476,16 @@ def run(
             )
             if result is not None:
                 _pause(input_reader, destination)
-        elif choice in {"4", "q", "Q"}:
+        elif choice == "4":
+            try:
+                action = "disable" if automatic_update_is_enabled() else "enable"
+            except AutomaticUpdateError:
+                action = "enable"
+            result = command_runner(["automatic-update", action])
+            _pause(input_reader, destination)
+            if result not in {0, 3}:
+                return result
+        elif choice in {"5", "q", "Q"}:
             _write(destination, "Au revoir.")
             return 0
         else:

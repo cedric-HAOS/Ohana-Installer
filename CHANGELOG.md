@@ -6,6 +6,29 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.7.0] — Mise à jour automatique — 2026-08-01
+
+## Ajouté
+
+- Option interactive d'activation et de désactivation de la mise à jour automatique.
+- Commande scriptable `ohana automatic-update enable|disable|status`.
+- Timer systemd quotidien à 04:00, persistant et décalé aléatoirement jusqu'à
+  30 minutes, avec journaux centralisés dans systemd-journald.
+- Mode `ohana update --if-needed` utilisé par le timer.
+
+## Modifié
+
+- Une exécution automatique ne réconcilie plus les configurations et ne redémarre
+  plus Agent ou Vision lorsque Installer et les composants sont déjà à jour.
+- La désinstallation supprime également le timer et son service.
+
+## Qualité
+
+- Tests des unités systemd, des commandes enable/disable et du chemin non disruptif.
+- 247 tests réussis.
+
+---
+
 # [1.6.1] — Application fiable des réservations DHCP — 2026-07-31
 
 ## Corrigé

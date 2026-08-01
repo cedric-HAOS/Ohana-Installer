@@ -41,7 +41,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.6.1** fournit une interface interactive et cinq commandes explicites :
+La version **1.7.0** fournit une interface interactive et six commandes explicites :
 
 ```text
 ohana
@@ -49,6 +49,7 @@ ohana versions
 ohana install
 ohana update
 ohana network
+ohana automatic-update
 ohana uninstall
 ```
 
@@ -64,13 +65,33 @@ sudo ohana
 1. Installer ou mettre à jour Agent et Vision
 2. Installer une composition antérieure
 3. Configurer le réseau d’INFRA-01
-4. Quitter
+4. Mise à jour automatique : désactivée
+5. Quitter
 ```
 
 Le premier choix installe la composition recommandée sur une machine neuve et
 met à jour une plateforme existante. Le deuxième choix charge dynamiquement le
 catalogue Platform et affiche les couples antérieurs sélectionnables. Le troisième
 modifie uniquement NetworkManager, sans télécharger ni réinstaller Agent ou Vision.
+Le quatrième active ou désactive un timer systemd quotidien de mise à jour.
+
+## Mise à jour automatique
+
+```bash
+sudo ohana automatic-update enable
+sudo ohana automatic-update status
+sudo ohana automatic-update disable
+```
+
+Le timer vérifie les mises à jour chaque jour à 04:00, avec un délai aléatoire
+maximal de 30 minutes et rattrapage au prochain démarrage. Lorsque Installer,
+Agent et Vision sont déjà à jour, aucune configuration n'est modifiée et aucun
+service n'est redémarré. Les exécutions sont consultables avec :
+
+```bash
+sudo systemctl status ohana-update.timer
+sudo journalctl -u ohana-update.service
+```
 
 Les commandes explicites restent disponibles pour les scripts et le dépannage.
 
@@ -294,7 +315,7 @@ nécessite donc aucune nouvelle version de l'Installer.
 
 # Compatibilité
 
-La version 1.6.1 cible les environnements Linux utilisant **systemd**.
+La version 1.7.0 cible les environnements Linux utilisant **systemd**.
 
 Prérequis : **Python 3.13 ou supérieur**. Cette contrainte correspond au
 minimum commun exigé par Ohana-Agent et Ohana-Vision.
@@ -306,7 +327,7 @@ La composition recommandée validée par `config/release-manifest.yaml` est :
 * Ohana-Vision 1.10.0.
 
 `config/release-catalog.yaml` contient toutes les compositions officiellement
-sélectionnables par Installer 1.6.1.
+sélectionnables par Installer 1.7.0.
 
 Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
 DHCP, WireGuard, Télémétrie Home Assistant et Z-Wave. Le manifeste détermine également

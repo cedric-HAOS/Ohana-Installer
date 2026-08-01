@@ -6,6 +6,24 @@ import argparse
 import shutil
 from pathlib import Path
 
+from ohana_installer.commands.automatic_update import (
+    SERVICE_NAME as AUTOMATIC_UPDATE_SERVICE_NAME,
+)
+from ohana_installer.commands.automatic_update import (
+    TIMER_NAME as AUTOMATIC_UPDATE_TIMER_NAME,
+)
+from ohana_installer.commands.automatic_update import (
+    AutomaticUpdateError,
+)
+from ohana_installer.commands.automatic_update import (
+    disable as disable_automatic_update,
+)
+from ohana_installer.commands.automatic_update import (
+    is_enabled as automatic_update_is_enabled,
+)
+from ohana_installer.commands.automatic_update import (
+    remove_units as remove_automatic_update_units,
+)
 from ohana_installer.commands.install import (
     AGENT_INSTALLATION_PATH,
     VISION_INSTALLATION_PATH,
@@ -112,8 +130,17 @@ def run(args: argparse.Namespace) -> int:
                 NETWORK_STATE_DIRECTORY,
             )
         )
+        automatic_update_exists = any(
+            (SYSTEMD_SYSTEM_DIRECTORY / name).exists()
+            for name in (AUTOMATIC_UPDATE_SERVICE_NAME, AUTOMATIC_UPDATE_TIMER_NAME)
+        )
 
-        if not installed_services and not existing_paths and not network_administration_exists:
+        if (
+            not installed_services
+            and not existing_paths
+            and not network_administration_exists
+            and not automatic_update_exists
+        ):
             print("✓ Aucune installation Ohana détectée.")
             return 0
 
@@ -133,6 +160,15 @@ def run(args: argparse.Namespace) -> int:
             return 0
 
         print()
+
+        if automatic_update_exists:
+            print("Suppression de la mise à jour automatique...")
+            if automatic_update_is_enabled():
+                disable_automatic_update()
+            remove_automatic_update_units()
+            reload_systemd_daemon()
+            print("✓ Mise à jour automatique supprimée.")
+            print()
 
         if installed_services:
             print("Arrêt des services systemd...")
@@ -191,7 +227,7 @@ def run(args: argparse.Namespace) -> int:
     except SystemdInstallationError as error:
         print(f"✗ Suppression systemd impossible : {error}")
         return UNINSTALLATION_ERROR
-    except (UninstallationError, NetworkProvisioningError) as error:
+    except (UninstallationError, NetworkProvisioningError, AutomaticUpdateError) as error:
         print(f"✗ Désinstallation impossible : {error}")
         return UNINSTALLATION_ERROR
 

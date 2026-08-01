@@ -46,13 +46,13 @@ def test_interactive_menu_quits_without_command(
 
     result = run(
         command_runner=lambda arguments: commands.append(arguments) or 0,
-        input_function=ScriptedInput(["4"]),
+        input_function=ScriptedInput(["5"]),
         output=output,
     )
 
     assert result == 0
     assert commands == []
-    assert "Ohana Installer 1.6.1" in output.getvalue()
+    assert "Ohana Installer 1.7.0" in output.getvalue()
     assert "Configurer le réseau" in output.getvalue()
 
 
@@ -68,7 +68,7 @@ def test_interactive_recommended_installs_on_empty_machine(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["1", "", "4"]),
+        input_function=ScriptedInput(["1", "", "5"]),
         output=output,
     )
 
@@ -88,7 +88,7 @@ def test_interactive_recommended_updates_existing_installation(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["1", "", "4"]),
+        input_function=ScriptedInput(["1", "", "5"]),
         output=output,
     )
 
@@ -134,7 +134,7 @@ def test_interactive_selects_catalog_release_and_allows_downgrade(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["2", "1", "o", "", "4"]),
+        input_function=ScriptedInput(["2", "1", "o", "", "5"]),
         output=output,
     )
 
@@ -223,7 +223,7 @@ def test_interactive_network_confirms_transaction(
 
     result = run(
         command_runner=lambda _arguments: 0,
-        input_function=ScriptedInput(["3", "o", "o", "", "4"]),
+        input_function=ScriptedInput(["3", "o", "o", "", "5"]),
         output=output,
     )
 
