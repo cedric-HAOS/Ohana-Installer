@@ -174,6 +174,18 @@ def render_systemd_service(
             ]
         )
 
+    state_directory = {
+        "ohana-agent.service": "ohana-agent",
+        "ohana-vision.service": "ohana-vision",
+    }.get(service.filename)
+    if state_directory is not None:
+        service_lines.extend(
+            [
+                f"StateDirectory={state_directory}",
+                "StateDirectoryMode=0750",
+            ]
+        )
+
     service_lines.extend(
         [
             "Restart=on-failure",

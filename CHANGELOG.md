@@ -6,6 +6,23 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.7.1] — Stockage persistant des composants — 2026-08-10
+
+## Modifié
+
+- Les unités systemd d'Ohana-Agent et d'Ohana-Vision déclarent désormais leurs
+  répertoires d'état avec `StateDirectory` et le mode `0750`.
+- systemd crée `/var/lib/ohana-agent` et `/var/lib/ohana-vision` avec le
+  propriétaire de service attendu avant leur démarrage, afin d'héberger
+  l'outbox Agent et la base d'observations Vision.
+
+## Qualité
+
+- Tests des unités générées pour Agent et Vision, lint et suite complète
+  validés avant publication.
+
+---
+
 # [1.7.0] — Mise à jour automatique — 2026-08-01
 
 ## Ajouté

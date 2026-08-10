@@ -509,6 +509,10 @@ def test_render_systemd_service() -> None:
         "--mqtt-config /etc/ohana-agent/plugins/mqtt.yaml"
     ) in content
     assert "Restart=on-failure" in content
+    assert "RuntimeDirectory=ohana-agent" in content
+    assert "RuntimeDirectoryMode=0750" in content
+    assert "StateDirectory=ohana-agent" in content
+    assert "StateDirectoryMode=0750" in content
     assert "NoNewPrivileges=false" in content
     assert "WantedBy=multi-user.target" in content
     assert content.endswith("\n")
@@ -580,6 +584,9 @@ def test_generate_systemd_services_generates_declared_services(
     assert len(results) == 2
     assert (tmp_path / "ohana-agent.service").exists()
     assert (tmp_path / "ohana-vision.service").exists()
+    vision_content = (tmp_path / "ohana-vision.service").read_text(encoding="utf-8")
+    assert "StateDirectory=ohana-vision" in vision_content
+    assert "StateDirectoryMode=0750" in vision_content
 
 
 def test_generate_systemd_services_ignores_component_without_service(

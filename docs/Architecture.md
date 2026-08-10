@@ -209,6 +209,10 @@ packages Python doivent être remplacés. Les configurations et les unités syst
 sont toujours réconciliées avec le manifeste courant sans écraser les fichiers
 locaux existants.
 
+Les unités Agent et Vision utilisent `StateDirectory` pour créer leurs espaces
+persistants respectifs sous `/var/lib`. L'outbox d'Agent et la base SQLite de
+Vision survivent ainsi aux redémarrages et aux mises à jour de paquets.
+
 ---
 
 # Gestion des composants
@@ -226,7 +230,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.7.0 cible les systèmes Linux utilisant **systemd**.
+La version 1.7.1 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 
