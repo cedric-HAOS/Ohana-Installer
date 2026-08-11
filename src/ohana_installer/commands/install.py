@@ -43,6 +43,7 @@ from ohana_installer.python_package import (
     secure_installation_tree,
     verify_component_command,
 )
+from ohana_installer.rclone import RcloneInstallationError, ensure_rclone
 from ohana_installer.release_selection import (
     ReleaseSelection,
     add_release_selection_arguments,
@@ -714,6 +715,9 @@ def run(args: argparse.Namespace) -> int:
             print()
             print("Installation d'Ohana-Agent...")
 
+            rclone_version = ensure_rclone()
+            print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
+
             installed_agent = _install_agent(downloaded_components)
 
             print(f"✓ {installed_agent.name} {installed_agent.version} installé.")
@@ -863,7 +867,7 @@ def run(args: argparse.Namespace) -> int:
     except ManifestError as error:
         print(f"✗ Le manifeste officiel est invalide : {error}")
         return INSTALLATION_ERROR
-    except PackageInstallationError as error:
+    except (PackageInstallationError, RcloneInstallationError) as error:
         print(f"✗ Installation impossible : {error}")
         return INSTALLATION_ERROR
     except ConfigurationInstallationError as error:

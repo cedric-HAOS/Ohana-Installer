@@ -63,6 +63,7 @@ from ohana_installer.python_package import (
     upgrade_wheel,
     verify_component_command,
 )
+from ohana_installer.rclone import RcloneInstallationError, ensure_rclone
 from ohana_installer.release_selection import (
     ReleaseSelection,
     add_release_selection_arguments,
@@ -621,6 +622,13 @@ def run(args: argparse.Namespace) -> int:
                         f"{CONFIGURATION_FILE_MODE:04o})."
                     )
 
+            if AGENT_IDENTIFIER in updated_identifiers:
+                print()
+                print("Préparation des sauvegardes iCloud...")
+
+                rclone_version = ensure_rclone()
+                print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
+
             print()
             print("Arrêt des services systemd...")
 
@@ -744,7 +752,7 @@ def run(args: argparse.Namespace) -> int:
     except ManifestError as error:
         print(f"✗ Le manifeste officiel est invalide : {error}")
         return UPDATE_ERROR
-    except PackageInstallationError as error:
+    except (PackageInstallationError, RcloneInstallationError) as error:
         print(f"✗ Mise à jour impossible : {error}")
         return UPDATE_ERROR
     except ConfigurationInstallationError as error:

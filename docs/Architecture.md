@@ -213,6 +213,13 @@ Les unités Agent et Vision utilisent `StateDirectory` pour créer leurs espaces
 persistants respectifs sous `/var/lib`. L'outbox d'Agent et la base SQLite de
 Vision survivent ainsi aux redémarrages et aux mises à jour de paquets.
 
+Avant l'installation d'Agent, Installer vérifie `/usr/bin/rclone`. Il télécharge
+uniquement l'archive Linux correspondant à l'architecture, compare son SHA-256
+à la valeur épinglée dans Installer puis remplace atomiquement le binaire. Lors
+d'une mise à jour, cette préparation est terminée avant l'arrêt des services.
+Les identifiants Apple et le jeton de confiance rclone restent hors du périmètre
+du manifeste et sont administrés localement par Agent depuis Vision.
+
 ---
 
 # Gestion des composants
@@ -230,7 +237,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.7.1 cible les systèmes Linux utilisant **systemd**.
+La version 1.7.2 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 

@@ -1309,3 +1309,11 @@ def test_install_cancellation_prevents_component_downloads(
 
     assert main(["install"]) == 0
     assert "Installation annulée" in capsys.readouterr().out
+
+
+@pytest.fixture(autouse=True)
+def _avoid_real_rclone_install(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        "ohana_installer.commands.install.ensure_rclone",
+        lambda: "1.74.4",
+    )

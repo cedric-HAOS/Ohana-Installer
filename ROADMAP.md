@@ -6,6 +6,15 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.7.2 — Dépendance rclone vérifiée
+
+**Statut : terminée.**
+
+* [x] Installer automatiquement rclone avec Agent.
+* [x] Épingler les archives Linux par architecture et leur SHA-256 officiel.
+* [x] Préparer rclone avant l'arrêt des services pendant une mise à jour.
+* [x] Publier les artefacts wheel, sdist et SHA256SUMS.
+
 # Version 1.7.0 — Mise à jour automatique
 
 **Statut : terminée.**

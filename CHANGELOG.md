@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.7.2] — Dépendance rclone vérifiée — 2026-08-11
+
+## Ajouté
+
+- Installation automatique de rclone lors de l'installation d'Agent et lors
+  d'une mise à jour qui remplace Agent.
+- Sélection des archives Linux AMD64, ARM64, ARMv7 ou ARMv6 et validation de
+  leur SHA-256 officiel avant installation atomique dans `/usr/bin/rclone`.
+
+## Modifié
+
+- La préparation de rclone précède l'arrêt des services afin de ne pas allonger
+  leur indisponibilité réseau.
+
 # [1.7.1] — Stockage persistant des composants — 2026-08-10
 
 ## Modifié
