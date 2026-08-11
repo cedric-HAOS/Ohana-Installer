@@ -52,7 +52,7 @@ def test_interactive_menu_quits_without_command(
 
     assert result == 0
     assert commands == []
-    assert "Ohana Installer 1.7.2" in output.getvalue()
+    assert "Ohana Installer 1.7.3" in output.getvalue()
     assert "Configurer le réseau" in output.getvalue()
 
 

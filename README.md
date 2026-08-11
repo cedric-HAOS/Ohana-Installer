@@ -41,7 +41,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.7.2** fournit une interface interactive et six commandes explicites :
+La version **1.7.3** fournit une interface interactive et six commandes explicites :
 
 ```text
 ohana
@@ -315,7 +315,7 @@ nécessite donc aucune nouvelle version de l'Installer.
 
 # Compatibilité
 
-La version 1.7.2 cible les environnements Linux utilisant **systemd**. Les
+La version 1.7.3 cible les environnements Linux utilisant **systemd**. Les
 unités créent aussi les répertoires d'état persistants d'Agent et Vision sous
 `/var/lib`, avec un accès limité au compte de service.
 
@@ -329,7 +329,7 @@ La composition recommandée validée par `config/release-manifest.yaml` est :
 * Ohana-Vision 1.10.0.
 
 `config/release-catalog.yaml` contient toutes les compositions officiellement
-sélectionnables par Installer 1.7.2.
+sélectionnables par Installer 1.7.3.
 
 Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
 DHCP, WireGuard, Télémétrie Home Assistant et Z-Wave. Le manifeste détermine également

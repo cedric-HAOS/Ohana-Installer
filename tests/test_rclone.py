@@ -41,6 +41,15 @@ def test_ensure_rclone_downloads_verified_architecture(
         lambda path: rclone.RCLONE_VERSION if path.is_file() else None,
     )
     destination = tmp_path / "rclone"
+    replace = rclone.os.replace
+
+    def assert_same_filesystem_staging(source, target) -> None:
+        source_path = rclone.Path(source)
+        target_path = rclone.Path(target)
+        assert source_path.parent == target_path.parent
+        replace(source_path, target_path)
+
+    monkeypatch.setattr(rclone.os, "replace", assert_same_filesystem_staging)
 
     assert rclone.ensure_rclone(destination) == rclone.RCLONE_VERSION
     assert destination.read_bytes() == b"rclone-binary"

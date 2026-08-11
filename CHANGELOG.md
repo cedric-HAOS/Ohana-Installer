@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.7.3] — Installation rclone inter-systèmes — 2026-08-11
+
+## Corrigé
+
+- Le binaire rclone est d'abord copié dans un fichier temporaire situé dans
+  son répertoire de destination, puis remplacé atomiquement. L'installation
+  fonctionne ainsi lorsque `/tmp` et `/usr` appartiennent à des systèmes de
+  fichiers différents et ne déclenche plus l'erreur `EXDEV`.
+
+## Qualité
+
+- Le test d'installation exige désormais que le fichier intermédiaire et la
+  destination partagent le même répertoire parent.
+
 # [1.7.2] — Dépendance rclone vérifiée — 2026-08-11
 
 ## Ajouté

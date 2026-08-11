@@ -237,7 +237,7 @@ Cette architecture permettra d'ajouter de nouveaux composants officiels sans rem
 
 # Compatibilité
 
-La version 1.7.2 cible les systèmes Linux utilisant **systemd**.
+La version 1.7.3 cible les systèmes Linux utilisant **systemd**.
 
 Les environnements de développement Windows restent pris en charge pour le développement et les tests du projet.
 

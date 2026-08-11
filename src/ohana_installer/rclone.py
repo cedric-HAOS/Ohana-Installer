@@ -57,12 +57,22 @@ def ensure_rclone(
                     raise RcloneInstallationError(
                         "L'archive rclone ne contient pas le binaire attendu."
                     )
-                extracted = Path(temporary) / "rclone"
-                with bundle.open(member) as source, extracted.open("wb") as target:
-                    shutil.copyfileobj(source, target)
-                extracted.chmod(0o755)
                 destination.parent.mkdir(parents=True, exist_ok=True)
-                os.replace(extracted, destination)
+                descriptor, staging_name = tempfile.mkstemp(
+                    prefix=".ohana-rclone-",
+                    dir=destination.parent,
+                )
+                staging = Path(staging_name)
+                try:
+                    with (
+                        os.fdopen(descriptor, "wb") as target,
+                        bundle.open(member) as source,
+                    ):
+                        shutil.copyfileobj(source, target)
+                    staging.chmod(0o755)
+                    os.replace(staging, destination)
+                finally:
+                    staging.unlink(missing_ok=True)
     except (OSError, BadZipFile) as error:
         raise RcloneInstallationError(f"Impossible d'installer rclone : {error}") from error
     if _installed_version(destination) != RCLONE_VERSION:

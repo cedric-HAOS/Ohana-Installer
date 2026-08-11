@@ -6,6 +6,14 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.7.3 — Installation rclone inter-systèmes
+
+**Statut : terminée.**
+
+* [x] Éviter le remplacement direct entre `/tmp` et `/usr`.
+* [x] Conserver un remplacement atomique dans le répertoire de destination.
+* [x] Tester explicitement la contrainte de même système de fichiers.
+
 # Version 1.7.2 — Dépendance rclone vérifiée
 
 **Statut : terminée.**
