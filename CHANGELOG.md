@@ -6,6 +6,14 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.1] — Identité age pendant la mise à jour directe — 2026-08-13
+
+## Corrigé
+
+- Le parcours direct `sudo ohana update` crée, valide et synchronise désormais
+  l'identité `age` d'INFRA-01 après la migration de `backup.yaml`, sans imposer
+  un second lancement du menu interactif.
+
 # [1.9.0] — Identité age et menus contextualisés — 2026-08-13
 
 ## Ajouté

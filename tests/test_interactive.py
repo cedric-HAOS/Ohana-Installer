@@ -86,8 +86,8 @@ def test_interactive_menu_quits_without_command(
     assert " ___  _   _    _    _   _    _" in rendered
     assert "/ _ \\| | | |  / \\  | \\ | |  / \\" in rendered
     assert "I N S T A L L E R" in rendered
-    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.0")
-    assert "Ohana Installer 1.9.0" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.1")
+    assert "Ohana Installer 1.9.1" in rendered
     assert "Configurer le réseau" in rendered
     assert "FIN DE SESSION" in rendered
 

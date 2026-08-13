@@ -66,6 +66,10 @@ def _prepare_administration_without_system_changes(
         "ohana_installer.commands.update.activate_administration",
         lambda _administration: None,
     )
+    monkeypatch.setattr(
+        "ohana_installer.commands.update.ensure_local_identity",
+        lambda: "age1managedrecipient",
+    )
 
 
 def _build_manifest() -> PlatformManifest:
@@ -213,7 +217,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    release = _installer_release("1.9.1")
+    release = _installer_release("1.9.2")
     operations: list[str] = []
 
     monkeypatch.setattr(
@@ -249,7 +253,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
         "verify_component_command",
         lambda **kwargs: InstalledPythonComponent(
             name="Ohana-Installer",
-            version="1.9.1",
+            version="1.9.2",
             environment_path=Path(sys.prefix),
             executable_path=Path(sys.prefix) / "bin" / "ohana",
         ),
@@ -262,12 +266,12 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
 
     assert result == "updated"
     assert operations == [
-        "download:ohana_installer-1.9.1-py3-none-any.whl",
-        (f"upgrade:ohana_installer-1.9.1-py3-none-any.whl:{sys.executable}"),
+        "download:ohana_installer-1.9.2-py3-none-any.whl",
+        (f"upgrade:ohana_installer-1.9.2-py3-none-any.whl:{sys.executable}"),
     ]
     output = capsys.readouterr().out
-    assert "1.9.1 téléchargé et vérifié" in output
-    assert "1.9.1 mis à jour" in output
+    assert "1.9.2 téléchargé et vérifié" in output
+    assert "1.9.2 mis à jour" in output
 
 
 def test_installer_self_update_can_be_declined(
@@ -277,7 +281,7 @@ def test_installer_self_update_can_be_declined(
     monkeypatch.setattr(
         update_command,
         "discover_latest_release",
-        lambda repository: _installer_release("1.9.1"),
+        lambda repository: _installer_release("1.9.2"),
     )
     monkeypatch.setattr(
         update_command,
@@ -307,7 +311,7 @@ def test_installer_self_update_requires_one_wheel(
         update_command,
         "discover_latest_release",
         lambda repository: _installer_release(
-            "1.9.1",
+            "1.9.2",
             include_wheel=False,
         ),
     )
@@ -412,6 +416,10 @@ def test_update_updates_and_restarts_official_components(
         lambda downloaded_files: operations.append("config") or (),
     )
     monkeypatch.setattr(
+        "ohana_installer.commands.update.ensure_local_identity",
+        lambda: operations.append("age-identity") or "age1managedrecipient",
+    )
+    monkeypatch.setattr(
         "ohana_installer.commands.update._stop_services",
         lambda services: operations.append("stop"),
     )
@@ -476,6 +484,7 @@ def test_update_updates_and_restarts_official_components(
         "download-config",
         "account",
         "config",
+        "age-identity",
         "stop",
         "agent:True",
         "vision:True",
@@ -492,6 +501,7 @@ def test_update_updates_and_restarts_official_components(
     assert "Vérification des comptes système" in output
     assert "Compte système ohana prêt" in output
     assert "Vérification des fichiers de configuration" in output
+    assert "Identité age INFRA-01 préparée" in output
     assert "Arrêt des services systemd" in output
     assert "Ohana-Agent 1.1.0 mis à jour" in output
     assert "Ohana-Vision 1.1.0 mis à jour" in output

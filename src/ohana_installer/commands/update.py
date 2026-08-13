@@ -15,6 +15,7 @@ from ohana_installer.administration import (
     activate_administration,
     prepare_administration,
 )
+from ohana_installer.age_identity import AgeIdentityError, ensure_local_identity
 from ohana_installer.commands.install import (
     AGENT_COMMAND_NAME,
     AGENT_ENVIRONMENT_PATH,
@@ -653,6 +654,8 @@ def run(args: argparse.Namespace) -> int:
 
                 rclone_version = ensure_rclone()
                 print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
+                recipient = ensure_local_identity()
+                print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
 
             print()
             print("Arrêt des services systemd...")
@@ -779,6 +782,7 @@ def run(args: argparse.Namespace) -> int:
         return UPDATE_ERROR
     except (
         CapabilityProvisioningError,
+        AgeIdentityError,
         ConfigurationMigrationError,
         PackageInstallationError,
         RcloneInstallationError,
