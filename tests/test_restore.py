@@ -7,11 +7,13 @@ import subprocess
 import tarfile
 from dataclasses import replace
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
 from ohana_installer.commands.restore import (
     _choose_remote_manifest,
+    _icloud_config,
     _select_icloud_manifest,
 )
 from ohana_installer.icloud import TemporaryICloudSession
@@ -183,6 +185,46 @@ def test_icloud_selection_reports_when_no_backup_exists(choose_backup: bool) -> 
             requested_id=None,
             manifest_reader=lambda _backup_id: pytest.fail("Aucun manifeste à lire."),
         )
+
+
+def test_restore_reuses_persistent_icloud_connection_without_credentials(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    persistent = tmp_path / "agent-rclone.conf"
+    persistent.write_text("[icloud]\n", encoding="utf-8")
+
+    selected = _icloud_config(
+        SimpleNamespace(rclone_config=None, apple_id=None),
+        tmp_path,
+        persistent_config=persistent,
+        input_function=lambda _prompt: pytest.fail("Apple ID ne doit pas être demandé."),
+        password_function=lambda _prompt: pytest.fail(
+            "Le mot de passe Apple ne doit pas être demandé."
+        ),
+    )
+
+    assert selected == persistent
+    assert "Connexion iCloud existante réutilisée" in capsys.readouterr().out
+
+
+def test_restore_honors_explicit_rclone_configuration(tmp_path: Path) -> None:
+    explicit = tmp_path / "explicit.conf"
+    explicit.write_text("[icloud]\n", encoding="utf-8")
+    persistent = tmp_path / "persistent.conf"
+    persistent.write_text("[icloud]\n", encoding="utf-8")
+
+    selected = _icloud_config(
+        SimpleNamespace(rclone_config=explicit, apple_id=None),
+        tmp_path,
+        persistent_config=persistent,
+        input_function=lambda _prompt: pytest.fail("Apple ID ne doit pas être demandé."),
+        password_function=lambda _prompt: pytest.fail(
+            "Le mot de passe Apple ne doit pas être demandé."
+        ),
+    )
+
+    assert selected == explicit
 
 
 def test_icloud_choice_lists_valid_backups_and_selects_by_number(

@@ -9,7 +9,7 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv4Interface, IPv4Network
 from pathlib import Path
-from typing import TextIO
+from typing import NoReturn, TextIO
 
 from ohana_installer.age_identity import AgeIdentityError, ensure_local_identity
 from ohana_installer.commands.automatic_update import (
@@ -24,6 +24,7 @@ from ohana_installer.commands.install import (
     VISION_COMMAND_NAME,
     VISION_ENVIRONMENT_PATH,
 )
+from ohana_installer.commands.update import _prepare_installer_update
 from ohana_installer.github import DownloadError
 from ohana_installer.manifest import ManifestError, PlatformReleaseEntry
 from ohana_installer.network import (
@@ -189,6 +190,38 @@ def _clear_terminal(output: TextIO) -> None:
     is_terminal = getattr(output, "isatty", lambda: False)()
     if is_terminal and os.environ.get("TERM", "") != "dumb":
         print("\033[2J\033[H", end="", file=output, flush=True)
+
+
+def _restart_interactive() -> NoReturn:
+    print("Redémarrage du menu avec la nouvelle version d'Ohana-Installer...")
+    os.execv(
+        sys.executable,
+        (sys.executable, "-m", "ohana_installer"),
+    )
+
+
+def _check_installer_before_menu(
+    output: TextIO,
+    *,
+    update_preparer: Callable[..., str] = _prepare_installer_update,
+    restart: Callable[[], NoReturn] = _restart_interactive,
+) -> str | None:
+    """Vérifier une seule fois Installer avant d'afficher le menu principal."""
+
+    try:
+        with tempfile.TemporaryDirectory(
+            prefix="ohana-installer-menu-update-",
+        ) as temporary_directory:
+            result = update_preparer(
+                Path(temporary_directory),
+                assume_yes=False,
+            )
+    except (DownloadError, PackageInstallationError, OSError) as error:
+        return f"Vérification de la mise à jour d'Ohana-Installer impossible : {error}"
+    if result == "updated":
+        restart()
+    _write(output)
+    return None
 
 
 def _inspect_version(
@@ -675,6 +708,11 @@ def run(
     input_reader = input_function or input
     destination = output or sys.stdout
     identity_checked = False
+    first_render = True
+    startup_warning = None
+    if os.name == "posix":
+        _clear_terminal(destination)
+        startup_warning = _check_installer_before_menu(destination)
 
     while True:
         status = _installed_status()
@@ -685,8 +723,13 @@ def run(
             except AgeIdentityError as error:
                 identity_warning = str(error)
             identity_checked = True
-        _clear_terminal(destination)
+        if not first_render:
+            _clear_terminal(destination)
         _render_main_menu(destination, status)
+        first_render = False
+        if startup_warning is not None:
+            _write(destination, f"⚠ {startup_warning}")
+            startup_warning = None
         if identity_warning is not None:
             _write(
                 destination,
@@ -723,7 +766,7 @@ def run(
                     return result
         elif choice == "3":
             _render_step_artwork(destination, "update")
-            result = command_runner(["update"])
+            result = command_runner(["update", "--installer-already-checked"])
             _pause(input_reader, destination)
             if result not in {0, 3}:
                 return result

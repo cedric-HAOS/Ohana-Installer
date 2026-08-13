@@ -132,6 +132,11 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
             "déjà les dernières versions officielles."
         ),
     )
+    parser.add_argument(
+        "--installer-already-checked",
+        action="store_true",
+        help=argparse.SUPPRESS,
+    )
     add_release_selection_arguments(parser)
     parser.add_argument(
         "--allow-downgrade",
@@ -428,6 +433,7 @@ def run(args: argparse.Namespace) -> int:
     assume_yes = bool(args.yes)
     if_needed = bool(args.if_needed)
     allow_downgrade = bool(args.allow_downgrade)
+    installer_already_checked = bool(args.installer_already_checked)
 
     try:
         release_selection = selection_from_args(args)
@@ -457,13 +463,15 @@ def run(args: argparse.Namespace) -> int:
     print()
 
     try:
-        with tempfile.TemporaryDirectory(
-            prefix="ohana-installer-self-update-",
-        ) as installer_temporary_directory:
-            installer_update = _prepare_installer_update(
-                Path(installer_temporary_directory),
-                assume_yes=assume_yes,
-            )
+        installer_update: InstallerUpdateResult = "current"
+        if not installer_already_checked:
+            with tempfile.TemporaryDirectory(
+                prefix="ohana-installer-self-update-",
+            ) as installer_temporary_directory:
+                installer_update = _prepare_installer_update(
+                    Path(installer_temporary_directory),
+                    assume_yes=assume_yes,
+                )
 
         if installer_update == "declined":
             return 0

@@ -43,6 +43,7 @@ RESTORE_ERROR = 3
 DEFAULT_REMOTE = "icloud:Ohana/Backups/infra-01"
 RUNTIME_DIRECTORY = Path("/run/ohana-installer/restore")
 RCLONE_BINARY = Path("/usr/bin/rclone")
+PERSISTENT_RCLONE_CONFIG = Path("/etc/ohana-agent/rclone.conf")
 
 
 def configure_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -77,7 +78,10 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument(
         "--rclone-config",
         type=Path,
-        help="Configuration rclone existante ; sinon une session iCloud temporaire est créée.",
+        help=(
+            "Configuration rclone existante ; la connexion Agent est réutilisée "
+            "automatiquement lorsqu'elle existe."
+        ),
     )
     parser.add_argument("--remote", default=DEFAULT_REMOTE, help=argparse.SUPPRESS)
     parser.add_argument("--apple-id", help="Apple ID ; demandé interactivement si nécessaire.")
@@ -85,13 +89,23 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.set_defaults(command_handler=run)
 
 
-def _temporary_icloud_config(args: argparse.Namespace, runtime: Path) -> Path:
+def _icloud_config(
+    args: argparse.Namespace,
+    runtime: Path,
+    *,
+    persistent_config: Path = PERSISTENT_RCLONE_CONFIG,
+    input_function: Callable[[str], str] = input,
+    password_function: Callable[[str], str] = getpass.getpass,
+) -> Path:
     if args.rclone_config is not None:
         if not args.rclone_config.is_file():
             raise RestoreError(f"Configuration rclone introuvable : {args.rclone_config}.")
         return args.rclone_config
-    apple_id = (args.apple_id or input("Apple ID : ")).strip()
-    password = getpass.getpass("Mot de passe Apple : ")
+    if persistent_config.is_file():
+        print(f"✓ Connexion iCloud existante réutilisée ({persistent_config}).")
+        return persistent_config
+    apple_id = (args.apple_id or input_function("Apple ID : ")).strip()
+    password = password_function("Mot de passe Apple : ")
     config_path = runtime / "rclone.conf"
     session = TemporaryICloudSession(
         binary=RCLONE_BINARY,
@@ -99,7 +113,7 @@ def _temporary_icloud_config(args: argparse.Namespace, runtime: Path) -> Path:
     )
     continuation = session.begin(apple_id, password)
     if continuation is not None:
-        code = input("Code de validation Apple à deux facteurs : ").strip()
+        code = input_function("Code de validation Apple à deux facteurs : ").strip()
         session.complete(continuation, code)
     return config_path
 
@@ -186,7 +200,7 @@ def run(args: argparse.Namespace) -> int:
                 manifest_bytes = (backup_directory / "manifest.json").read_bytes()
             else:
                 ensure_rclone(temporary_directory=runtime)
-                rclone_config = _temporary_icloud_config(args, runtime)
+                rclone_config = _icloud_config(args, runtime)
                 backup_ids = list_remote_backup_ids(
                     rclone_binary=RCLONE_BINARY,
                     rclone_config=rclone_config,

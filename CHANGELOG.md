@@ -6,6 +6,24 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.3] — Vérification au démarrage et connexion iCloud — 2026-08-13
+
+## Modifié
+
+- `sudo ohana` vérifie désormais immédiatement si une nouvelle version
+  d'Ohana-Installer est disponible, propose son installation avant d'afficher
+  le menu, puis redémarre automatiquement ce menu avec la nouvelle version.
+
+## Corrigé
+
+- La restauration iCloud réutilise automatiquement la connexion enregistrée
+  dans `/etc/ohana-agent/rclone.conf`. Les identifiants Apple ne sont demandés
+  que sur une machine neuve ou dépourvue de configuration iCloud locale.
+
+## Validation
+
+- 288 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.9.2] — Sélection des sauvegardes iCloud — 2026-08-13
 
 ## Ajouté

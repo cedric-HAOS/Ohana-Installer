@@ -6,6 +6,8 @@ import io
 from collections.abc import Sequence
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv4Interface
+from pathlib import Path
+from typing import NoReturn
 
 import pytest
 
@@ -14,6 +16,7 @@ from ohana_installer.interactive import (
     OHANA_WORDMARK,
     STEP_ARTWORKS,
     InstalledStatus,
+    _check_installer_before_menu,
     _is_downgrade,
     _network_configuration_form,
     _prefix_from_mask,
@@ -65,6 +68,37 @@ def test_each_menu_action_has_unique_ascii_artwork() -> None:
         assert all(len(line) <= MENU_WIDTH for line in rendered.splitlines())
 
 
+def test_installer_is_checked_once_before_menu(tmp_path: Path) -> None:
+    output = io.StringIO()
+    calls: list[tuple[Path, bool]] = []
+
+    warning = _check_installer_before_menu(
+        output,
+        update_preparer=lambda path, *, assume_yes: (
+            calls.append((path, assume_yes)) or "current"
+        ),
+        restart=lambda: pytest.fail("Le menu ne doit pas redémarrer."),
+    )
+
+    assert warning is None
+    assert len(calls) == 1
+    assert calls[0][1] is False
+
+
+def test_installer_update_restarts_interactive_menu() -> None:
+    output = io.StringIO()
+
+    def restart() -> NoReturn:
+        raise RuntimeError("menu restarted")
+
+    with pytest.raises(RuntimeError, match="menu restarted"):
+        _check_installer_before_menu(
+            output,
+            update_preparer=lambda _path, *, assume_yes: "updated",
+            restart=restart,
+        )
+
+
 def test_interactive_menu_quits_without_command(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -87,8 +121,8 @@ def test_interactive_menu_quits_without_command(
     assert " ___  _   _    _    _   _    _" in rendered
     assert "/ _ \\| | | |  / \\  | \\ | |  / \\" in rendered
     assert "I N S T A L L E R" in rendered
-    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.2")
-    assert "Ohana Installer 1.9.2" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.3")
+    assert "Ohana Installer 1.9.3" in rendered
     rendered_lines = rendered.splitlines()
     logo_lines = rendered_lines[:5]
     expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:5]))) // 2
@@ -136,7 +170,7 @@ def test_interactive_update_is_a_distinct_menu_action(
     )
 
     assert result == 0
-    assert commands == [("update",)]
+    assert commands == [("update", "--installer-already-checked")]
     assert "MISE A JOUR" in output.getvalue()
 
 
