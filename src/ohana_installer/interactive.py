@@ -58,15 +58,29 @@ STATUS_LABELS = {
 SUPPORTED_RELEASE_MENU_LIMIT = 9
 MENU_WIDTH = 72
 OHANA_WORDMARK = (
-    " ___  _   _    _    _   _    _",
-    "/ _ \\| | | |  / \\  | \\ | |  / \\",
-    "| | | | |_| | / _ \\ |  \\| | / _ \\",
-    "| |_| |  _  |/ ___ \\| |\\  |/ ___ \\",
-    " \\___/|_| |_/_/   \\_\\_| \\_/_/   \\_\\",
+    "      .-.",
+    "  .--(   )--.    Ohana",
+    " (    \\ /    )",
+    "  `--.   .--'",
+    "     (   )",
+    "      `-'",
     "",
     "I N S T A L L E R",
 )
-OHANA_LOGO_LINE_COUNT = 5
+OHANA_LOGO_LINE_COUNT = 6
+ANSI_RESET = "\033[0m"
+ANSI_BLUE = "\033[38;2;24;174;234m"
+ANSI_ORANGE = "\033[38;2;255;143;28m"
+ANSI_RED = "\033[38;2;247;53;69m"
+ANSI_GREEN = "\033[38;2;87;205;79m"
+OHANA_LOGO_COLOR_SPANS = (
+    ((6, 9, ANSI_BLUE),),
+    ((2, 5, ANSI_GREEN), (5, 10, ANSI_BLUE), (10, 13, ANSI_ORANGE)),
+    ((1, 7, ANSI_GREEN), (8, 14, ANSI_ORANGE)),
+    ((2, 6, ANSI_GREEN), (9, 13, ANSI_ORANGE)),
+    ((5, 10, ANSI_RED),),
+    ((6, 9, ANSI_RED),),
+)
 STEP_ARTWORKS = {
     "install": (
         "INSTALLATION",
@@ -146,6 +160,33 @@ class InstalledStatus:
 
 def _write(output: TextIO, text: str = "") -> None:
     print(text, file=output)
+
+
+def _terminal_colors_enabled(output: TextIO) -> bool:
+    """N'activer les couleurs que pour un terminal qui les accepte."""
+
+    is_terminal = getattr(output, "isatty", lambda: False)()
+    return bool(is_terminal and "NO_COLOR" not in os.environ and os.getenv("TERM") != "dumb")
+
+
+def _colorize_logo_line(line: str, line_index: int) -> str:
+    fragments: list[str] = []
+    cursor = 0
+    for start, end, color in OHANA_LOGO_COLOR_SPANS[line_index]:
+        fragments.extend((line[cursor:start], color, line[start:end], ANSI_RESET))
+        cursor = end
+    fragments.append(line[cursor:])
+    return "".join(fragments)
+
+
+def _render_logo(output: TextIO, width: int) -> None:
+    logo_lines = OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT]
+    logo_width = max(map(len, logo_lines))
+    logo_padding = " " * ((width - logo_width + 1) // 2)
+    colors_enabled = _terminal_colors_enabled(output)
+    for line_index, line in enumerate(logo_lines):
+        rendered_line = _colorize_logo_line(line, line_index) if colors_enabled else line
+        _write(output, logo_padding + rendered_line)
 
 
 def _render_step_artwork(output: TextIO, identifier: str) -> None:
@@ -263,11 +304,7 @@ def _render_main_menu(output: TextIO, status: InstalledStatus) -> None:
         "détectée" if VISION_ENVIRONMENT_PATH.exists() else "absente"
     )
     width = MENU_WIDTH
-    logo_lines = OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT]
-    logo_width = max(map(len, logo_lines))
-    logo_padding = " " * ((width - logo_width + 1) // 2)
-    for line in logo_lines:
-        _write(output, logo_padding + line)
+    _render_logo(output, width)
     _write(output)
     title = OHANA_WORDMARK[-1]
     title_padding = " " * ((width - len(title) + 1) // 2)

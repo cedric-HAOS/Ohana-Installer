@@ -6,6 +6,21 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.5] — Identité visuelle du terminal — 2026-08-13
+
+## Corrigé
+
+- Le grand lettrage ASCII générique est remplacé par une adaptation terminal du
+  logo officiel Ohana, associant le symbole à quatre pétales au mot-symbole.
+- Les pétales reprennent leurs couleurs officielles : bleu en haut, vert à
+  gauche, orange à droite et rouge en bas.
+- Les couleurs ANSI sont limitées aux terminaux compatibles et respectent
+  `NO_COLOR` ; les sorties redirigées restent sans séquences de contrôle.
+
+## Validation
+
+- 292 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.9.4] — Restauration iCloud et alignement du logo — 2026-08-13
 
 ## Corrigé

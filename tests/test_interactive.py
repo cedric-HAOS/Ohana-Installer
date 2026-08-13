@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from ipaddress import IPv4Address, IPv4Interface
@@ -13,6 +14,7 @@ import pytest
 
 from ohana_installer.interactive import (
     MENU_WIDTH,
+    OHANA_LOGO_LINE_COUNT,
     OHANA_WORDMARK,
     STEP_ARTWORKS,
     InstalledStatus,
@@ -20,6 +22,7 @@ from ohana_installer.interactive import (
     _is_downgrade,
     _network_configuration_form,
     _prefix_from_mask,
+    _render_logo,
     _render_step_artwork,
     _select_release,
     run,
@@ -41,6 +44,11 @@ class ScriptedInput:
         if not self.answers:
             raise AssertionError("Aucune réponse interactive restante.")
         return self.answers.pop(0)
+
+
+class TerminalBuffer(io.StringIO):
+    def isatty(self) -> bool:
+        return True
 
 
 def test_each_menu_action_has_unique_ascii_artwork() -> None:
@@ -68,15 +76,41 @@ def test_each_menu_action_has_unique_ascii_artwork() -> None:
         assert all(len(line) <= MENU_WIDTH for line in rendered.splitlines())
 
 
+def test_logo_uses_official_petal_colors_in_terminal(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("NO_COLOR", raising=False)
+    monkeypatch.setenv("TERM", "xterm-256color")
+    output = TerminalBuffer()
+
+    _render_logo(output, MENU_WIDTH)
+
+    rendered = output.getvalue()
+    assert "\033[38;2;24;174;234m" in rendered
+    assert "\033[38;2;255;143;28m" in rendered
+    assert "\033[38;2;247;53;69m" in rendered
+    assert "\033[38;2;87;205;79m" in rendered
+    plain_lines = re.sub(r"\033\[[0-9;]*m", "", rendered).splitlines()
+    expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:6])) + 1) // 2
+    assert plain_lines == [" " * expected_padding + line for line in OHANA_WORDMARK[:6]]
+
+
+def test_logo_honors_no_color(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("NO_COLOR", "1")
+    output = TerminalBuffer()
+
+    _render_logo(output, MENU_WIDTH)
+
+    assert "\033[" not in output.getvalue()
+
+
 def test_installer_is_checked_once_before_menu(tmp_path: Path) -> None:
     output = io.StringIO()
     calls: list[tuple[Path, bool]] = []
 
     warning = _check_installer_before_menu(
         output,
-        update_preparer=lambda path, *, assume_yes: (
-            calls.append((path, assume_yes)) or "current"
-        ),
+        update_preparer=lambda path, *, assume_yes: calls.append((path, assume_yes)) or "current",
         restart=lambda: pytest.fail("Le menu ne doit pas redémarrer."),
     )
 
@@ -118,16 +152,18 @@ def test_interactive_menu_quits_without_command(
     assert result == 0
     assert commands == []
     rendered = output.getvalue()
-    assert " ___  _   _    _    _   _    _" in rendered
-    assert "/ _ \\| | | |  / \\  | \\ | |  / \\" in rendered
+    assert "  .--(   )--.    Ohana" in rendered
+    assert " (    \\ /    )" in rendered
     assert "I N S T A L L E R" in rendered
-    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.4")
-    assert "Ohana Installer 1.9.4" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.5")
+    assert "Ohana Installer 1.9.5" in rendered
     rendered_lines = rendered.splitlines()
-    logo_lines = rendered_lines[:5]
-    expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:5])) + 1) // 2
+    logo_lines = rendered_lines[:OHANA_LOGO_LINE_COUNT]
+    expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT])) + 1) // 2
     assert all(line.startswith(" " * expected_padding) for line in logo_lines)
-    assert [line[expected_padding:] for line in logo_lines] == list(OHANA_WORDMARK[:5])
+    assert [line[expected_padding:] for line in logo_lines] == list(
+        OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT]
+    )
     title_line = next(line for line in rendered_lines if "I N S T A L L E R" in line)
     expected_title_padding = (MENU_WIDTH - len(OHANA_WORDMARK[-1]) + 1) // 2
     assert title_line == " " * expected_title_padding + OHANA_WORDMARK[-1]
