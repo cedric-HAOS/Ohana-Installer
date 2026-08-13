@@ -6,6 +6,41 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.0] — Identité age et menus contextualisés — 2026-08-13
+
+## Ajouté
+
+- Une installation neuve installe `age` si nécessaire, crée l'identité
+  d'INFRA-01 et enregistre sa copie de récupération dans iCloud dès que la
+  connexion rclone est disponible.
+- Au lancement du menu sur une installation existante, Installer valide une
+  seule fois l'identité locale, la répare si nécessaire et la synchronise.
+- Une restauration iCloud récupère automatiquement l'identité avant le
+  déchiffrement et l'installe sur la nouvelle machine ; aucune clé ne doit être
+  saisie dans ce parcours.
+- Le passage à Installer 1.9.0 migre atomiquement le fichier `backup.yaml`
+  existant : seuls les anciens paramètres `age` d'INFRA-01 sont remplacés par
+  les chemins gérés, sans perdre les cibles, secrets, horaires ni rétention.
+
+## Modifié
+
+- Le menu principal s'ouvre sur un mot-symbole Ohana en ASCII, centré et
+  compatible avec sa largeur de 72 colonnes.
+- Chacune des huit actions du menu dispose de sa propre illustration ASCII
+  compacte pour identifier visuellement le parcours sélectionné.
+- Le menu des capacités diagnostique automatiquement DHCP et la référence
+  temporelle, affiche leur état, puis ne propose pour chacune que l'action
+  opposée : activer ou désactiver.
+- Le menu interactif ne présente plus les compositions historiques : il reste
+  limité aux neuf versions antérieures les plus récentes portant le statut
+  `supported`.
+- Les entrées `legacy` restent dans le catalogue et demeurent sélectionnables
+  par leur version exacte pour restaurer une sauvegarde existante.
+
+## Validation
+
+- 279 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.8.1] — Visibilité de l'utilitaire age — 2026-08-13
 
 ## Corrigé

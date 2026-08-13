@@ -338,8 +338,9 @@ def install_platform(
     )
     action = "update" if agent_environment.exists() or vision_environment.exists() else "install"
     downgrade = ("--allow-downgrade",) if action == "update" else ()
+    restore_options = ("--defer-age-identity",) if action == "install" else ()
     result = command_runner(
-        (*command, action, "--yes", *selection, *downgrade),
+        (*command, action, "--yes", *selection, *downgrade, *restore_options),
         check=False,
     )
     if result.returncode != 0:

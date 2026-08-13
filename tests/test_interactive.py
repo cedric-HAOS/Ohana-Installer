@@ -10,10 +10,14 @@ from ipaddress import IPv4Address, IPv4Interface
 import pytest
 
 from ohana_installer.interactive import (
+    MENU_WIDTH,
+    STEP_ARTWORKS,
     InstalledStatus,
     _is_downgrade,
     _network_configuration_form,
     _prefix_from_mask,
+    _render_step_artwork,
+    _select_release,
     run,
 )
 from ohana_installer.manifest import PlatformReleaseCatalog, PlatformReleaseEntry
@@ -22,6 +26,7 @@ from ohana_installer.network import (
     NetworkProvisioningError,
     PendingNetworkChange,
 )
+from ohana_installer.system_capabilities import CapabilityStatus
 
 
 @dataclass
@@ -32,6 +37,31 @@ class ScriptedInput:
         if not self.answers:
             raise AssertionError("Aucune réponse interactive restante.")
         return self.answers.pop(0)
+
+
+def test_each_menu_action_has_unique_ascii_artwork() -> None:
+    expected = {
+        "install",
+        "restore",
+        "update",
+        "composition",
+        "capabilities",
+        "network",
+        "automatic-update",
+        "quit",
+    }
+
+    assert set(STEP_ARTWORKS) == expected
+    assert len({artwork for _title, artwork in STEP_ARTWORKS.values()}) == len(expected)
+
+    for identifier, (title, _artwork) in STEP_ARTWORKS.items():
+        output = io.StringIO()
+        _render_step_artwork(output, identifier)
+        rendered = output.getvalue()
+
+        assert title in rendered
+        assert rendered.isascii()
+        assert all(len(line) <= MENU_WIDTH for line in rendered.splitlines())
 
 
 def test_interactive_menu_quits_without_command(
@@ -52,8 +82,14 @@ def test_interactive_menu_quits_without_command(
 
     assert result == 0
     assert commands == []
-    assert "Ohana Installer 1.8.1" in output.getvalue()
-    assert "Configurer le réseau" in output.getvalue()
+    rendered = output.getvalue()
+    assert " ___  _   _    _    _   _    _" in rendered
+    assert "/ _ \\| | | |  / \\  | \\ | |  / \\" in rendered
+    assert "I N S T A L L E R" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.0")
+    assert "Ohana Installer 1.9.0" in rendered
+    assert "Configurer le réseau" in rendered
+    assert "FIN DE SESSION" in rendered
 
 
 def test_interactive_recommended_installs_on_empty_machine(
@@ -74,6 +110,7 @@ def test_interactive_recommended_installs_on_empty_machine(
 
     assert result == 0
     assert commands == [("install",)]
+    assert "INSTALLATION" in output.getvalue()
 
 
 def test_interactive_update_is_a_distinct_menu_action(
@@ -94,6 +131,7 @@ def test_interactive_update_is_a_distinct_menu_action(
 
     assert result == 0
     assert commands == [("update",)]
+    assert "MISE A JOUR" in output.getvalue()
 
 
 def test_interactive_selects_catalog_release_and_allows_downgrade(
@@ -120,6 +158,13 @@ def test_interactive_selects_catalog_release_and_allows_downgrade(
                 vision_version="1.9.0",
                 status="supported",
             ),
+            PlatformReleaseEntry(
+                platform_version="1.0.19",
+                release_tag="v1.0.19",
+                agent_version="1.9.0",
+                vision_version="1.8.0",
+                status="legacy",
+            ),
         ),
     )
     monkeypatch.setattr(
@@ -140,6 +185,59 @@ def test_interactive_selects_catalog_release_and_allows_downgrade(
 
     assert result == 0
     assert commands == [("update", "--platform-version", "1.0.20", "--allow-downgrade")]
+    rendered = output.getvalue()
+    assert "Compositions Agent/Vision antérieures supportées (1)" in rendered
+    assert "Platform 1.0.19" not in rendered
+    assert (
+        "Les compositions historiques restent utilisables pour restaurer une sauvegarde existante."
+    ) in rendered
+
+
+def test_interactive_limits_supported_release_menu_to_nine(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = io.StringIO()
+    supported = tuple(
+        PlatformReleaseEntry(
+            platform_version=f"1.0.{51 - index}",
+            release_tag=f"v1.0.{51 - index}",
+            agent_version=f"1.{13 - index}.0",
+            vision_version=f"1.{12 - index}.0",
+            status="supported",
+        )
+        for index in range(10)
+    )
+    catalog = PlatformReleaseCatalog(
+        schema_version=1,
+        platform_name="Ohana",
+        platform_version="1.0.52",
+        default_platform_version="1.0.52",
+        releases=(
+            PlatformReleaseEntry(
+                platform_version="1.0.52",
+                release_tag="v1.0.52",
+                agent_version="1.13.1",
+                vision_version="1.12.1",
+                status="recommended",
+            ),
+            *supported,
+        ),
+    )
+    monkeypatch.setattr(
+        "ohana_installer.interactive.download_release_catalog",
+        lambda _directory: catalog,
+    )
+
+    selected = _select_release(
+        input_function=ScriptedInput(["0"]),
+        output=output,
+    )
+
+    assert selected is None
+    rendered = output.getvalue()
+    assert "Compositions Agent/Vision antérieures supportées (9)" in rendered
+    assert "Platform 1.0.43" in rendered
+    assert "Platform 1.0.42" not in rendered
 
 
 def test_network_form_accepts_dotted_mask() -> None:
@@ -239,18 +337,47 @@ def test_interactive_dhcp_activation_uses_generic_previous_server_wording(
         "ohana_installer.interactive._installed_status",
         lambda: InstalledStatus("1.12.7", "1.11.8", True),
     )
+    monkeypatch.setattr(
+        "ohana_installer.interactive.local_capability_statuses",
+        lambda: (
+            CapabilityStatus(
+                identifier="dhcp",
+                name="Attribution des adresses IP",
+                implementation="dnsmasq",
+                installed=True,
+                configured=True,
+                active=False,
+                state="Configurée, inactive",
+            ),
+            CapabilityStatus(
+                identifier="time-reference",
+                name="Référence temporelle",
+                implementation="chrony",
+                installed=True,
+                configured=True,
+                active=True,
+                state="Active",
+            ),
+        ),
+    )
     commands: list[Sequence[str]] = []
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["5", "2", "o", "", "8"]),
+        input_function=ScriptedInput(["5", "1", "o", "", "8"]),
         output=output,
     )
 
     assert result == 0
     assert commands == [("capability", "activate", "dhcp", "--yes")]
-    assert "L'ancien serveur DHCP a-t-il été désactivé ?" in output.getvalue()
-    assert "Freebox" not in output.getvalue()
+    rendered = output.getvalue()
+    assert "DHCP (dnsmasq) : Configurée, inactive" in rendered
+    assert "Référence temporelle (chrony) : Active" in rendered
+    assert "1. Activer DHCP" in rendered
+    assert "2. Désactiver la référence temporelle" in rendered
+    assert "Afficher le diagnostic" not in rendered
+    assert "L'ancien serveur DHCP a-t-il été désactivé ?" in rendered
+    assert "Freebox" not in rendered
 
 
 def test_interactive_builds_local_restore_command(

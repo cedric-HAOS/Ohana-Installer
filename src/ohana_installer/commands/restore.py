@@ -9,6 +9,13 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+from ohana_installer.age_identity import (
+    IDENTITY_PATH,
+    AgeIdentityError,
+    download_recovery_identity,
+    ensure_age_installed,
+    install_identity,
+)
 from ohana_installer.confirmation import confirm_action
 from ohana_installer.icloud import ICloudAuthenticationError, TemporaryICloudSession
 from ohana_installer.rclone import RcloneInstallationError, ensure_rclone
@@ -29,7 +36,6 @@ RESTORE_ERROR = 3
 DEFAULT_REMOTE = "icloud:Ohana/Backups/infra-01"
 RUNTIME_DIRECTORY = Path("/run/ohana-installer/restore")
 RCLONE_BINARY = Path("/usr/bin/rclone")
-AGE_BINARY = Path("/usr/bin/age")
 
 
 def configure_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -50,8 +56,7 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
     parser.add_argument(
         "--identity",
         type=Path,
-        required=True,
-        help="Fichier d'identité privée age conservé hors d'INFRA-01.",
+        help="Identité age locale ; récupérée automatiquement depuis iCloud si absente.",
     )
     parser.add_argument(
         "--rclone-config",
@@ -81,28 +86,6 @@ def _temporary_icloud_config(args: argparse.Namespace, runtime: Path) -> Path:
         code = input("Code de validation Apple à deux facteurs : ").strip()
         session.complete(continuation, code)
     return config_path
-
-
-def _ensure_age() -> None:
-    if AGE_BINARY.is_file():
-        return
-    commands = (
-        ("/usr/bin/apt-get", "update"),
-        (
-            "/usr/bin/apt-get",
-            "install",
-            "--yes",
-            "--no-install-recommends",
-            "age",
-        ),
-    )
-    for command in commands:
-        result = subprocess.run(command, capture_output=True, text=True, check=False)
-        if result.returncode != 0:
-            detail = (result.stderr or result.stdout or "erreur inconnue").strip()
-            raise RestoreError(f"Installation de age impossible : {detail}")
-    if not AGE_BINARY.is_file():
-        raise RestoreError(f"Binaire age introuvable après installation : {AGE_BINARY}.")
 
 
 def run(args: argparse.Namespace) -> int:
@@ -158,7 +141,24 @@ def run(args: argparse.Namespace) -> int:
                 print("Restauration annulée.")
                 return 0
 
-            _ensure_age()
+            ensure_age_installed()
+            identity_path = args.identity
+            recovered_identity = False
+            if identity_path is None and IDENTITY_PATH.is_file():
+                identity_path = IDENTITY_PATH
+            if identity_path is None and args.local is None:
+                assert rclone_config is not None
+                identity_path = download_recovery_identity(
+                    runtime / "infra-01.agekey",
+                    rclone_config=rclone_config,
+                )
+                recovered_identity = True
+                print("✓ Identité age récupérée depuis iCloud.")
+            if identity_path is None:
+                raise RestoreError(
+                    "Une restauration locale nécessite --identity ; "
+                    "la récupération automatique est disponible avec --icloud."
+                )
             staging = runtime / "staging"
             if args.local is not None:
                 archive_path = backup_directory / manifest.archive.filename
@@ -166,7 +166,7 @@ def run(args: argparse.Namespace) -> int:
                     decrypt_and_extract(
                         stream,
                         manifest=manifest,
-                        identity_path=args.identity,
+                        identity_path=identity_path,
                         staging_directory=staging,
                     )
             else:
@@ -190,7 +190,7 @@ def run(args: argparse.Namespace) -> int:
                 decrypt_and_extract(
                     process.stdout,
                     manifest=manifest,
-                    identity_path=args.identity,
+                    identity_path=identity_path,
                     staging_directory=staging,
                 )
                 _stdout, stderr = process.communicate()
@@ -201,12 +201,18 @@ def run(args: argparse.Namespace) -> int:
             print("✓ Archive déchiffrée, SHA-256 vérifié et contenu contrôlé.")
             install_platform(manifest)
             apply_staged_configuration(staging / "payload")
+            install_identity(identity_path)
+            if recovered_identity:
+                print("✓ Identité age installée sur la nouvelle machine.")
+            else:
+                print("✓ Identité age locale installée et validée.")
             print("✓ Configurations restaurées et services validés.")
             print("La capacité DHCP reste inactive par sécurité.")
             print("Activez-la avec : ohana capability activate dhcp")
             return 0
     except (
         ICloudAuthenticationError,
+        AgeIdentityError,
         OSError,
         RcloneInstallationError,
         RestoreError,

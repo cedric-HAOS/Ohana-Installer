@@ -373,6 +373,10 @@ def test_install_downloads_and_installs_official_components(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     manifest = _build_manifest()
+    monkeypatch.setattr(
+        "ohana_installer.commands.install.ensure_local_identity",
+        lambda: "age1managedrecipient",
+    )
 
     monkeypatch.setattr(
         "ohana_installer.commands.install.run_environment_checks",

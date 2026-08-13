@@ -138,12 +138,12 @@ Installer peut également retrouver la sauvegarde la plus récente dans iCloud :
 
 ```bash
 sudo ohana restore \
-  --icloud \
-  --identity /media/usb/ohana-infra-01.agekey
+  --icloud
 ```
 
-La clé privée `age` doit être conservée hors d'INFRA-01. Pour iCloud, Installer
-demande l'identifiant Apple, le mot de passe et, si nécessaire, le code 2FA dans
+Installer récupère automatiquement dans iCloud l'identité `age` associée à la
+sauvegarde, puis demande l'identifiant Apple, le mot de passe et, si nécessaire,
+le code 2FA dans
 une session rclone temporaire. Les archives, la configuration rclone et les
 fichiers déchiffrés restent dans `/run`, qui doit être un `tmpfs` : aucune copie
 intermédiaire n'est écrite sur la carte microSD.

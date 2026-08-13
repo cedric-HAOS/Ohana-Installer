@@ -11,6 +11,7 @@ from ipaddress import IPv4Address, IPv4Interface, IPv4Network
 from pathlib import Path
 from typing import TextIO
 
+from ohana_installer.age_identity import AgeIdentityError, ensure_local_identity
 from ohana_installer.commands.automatic_update import (
     AutomaticUpdateError,
 )
@@ -38,6 +39,11 @@ from ohana_installer.python_package import (
     inspect_installed_component,
 )
 from ohana_installer.release_selection import download_release_catalog
+from ohana_installer.system_capabilities import (
+    CapabilityProvisioningError,
+    CapabilityStatus,
+    local_capability_statuses,
+)
 from ohana_installer.version import __version__
 
 CommandRunner = Callable[[Sequence[str]], int]
@@ -47,6 +53,83 @@ STATUS_LABELS = {
     "recommended": "Recommandée",
     "supported": "Supportée",
     "legacy": "Historique",
+}
+SUPPORTED_RELEASE_MENU_LIMIT = 9
+MENU_WIDTH = 72
+OHANA_WORDMARK = (
+    " ___  _   _    _    _   _    _",
+    "/ _ \\| | | |  / \\  | \\ | |  / \\",
+    "| | | | |_| | / _ \\ |  \\| | / _ \\",
+    "| |_| |  _  |/ ___ \\| |\\  |/ ___ \\",
+    " \\___/|_| |_/_/   \\_\\_| \\_/_/   \\_\\",
+    "",
+    "I N S T A L L E R",
+)
+STEP_ARTWORKS = {
+    "install": (
+        "INSTALLATION",
+        (
+            "+-------------+",
+            "|  INFRA-01   |",
+            "+------^------+",
+        ),
+    ),
+    "restore": (
+        "RESTAURATION",
+        (
+            "[ iCloud ] ---- archive.age ----> [ INFRA-01 ]",
+            "                 verified",
+            "                    |",
+        ),
+    ),
+    "update": (
+        "MISE A JOUR",
+        (
+            "[ version actuelle ] ==========> [ derniere version ]",
+            "                         ^",
+            "                    synchroniser",
+        ),
+    ),
+    "composition": (
+        "COMPOSITIONS",
+        (
+            "[ Agent ] + [ Vision ]",
+            "          |",
+            "     [ Platform ]",
+        ),
+    ),
+    "capabilities": (
+        "CAPACITES",
+        (
+            "[ DHCP ]     [ NTP ]     [ age ]",
+            "     \\          |          /",
+            "      +------ INFRA-01 ---+",
+        ),
+    ),
+    "network": (
+        "RESEAU",
+        (
+            "o-----------o-----------o",
+            "ROUTEUR   INFRA-01      LAN",
+            "      adresse . liaison",
+        ),
+    ),
+    "automatic-update": (
+        "MISE A JOUR AUTOMATIQUE",
+        (
+            ".-----------------------.",
+            "| calendrier ----> Ohana |",
+            "'-----------o-----------'",
+        ),
+    ),
+    "quit": (
+        "FIN DE SESSION",
+        (
+            "       \\o/",
+            "        |",
+            "       / \\",
+        ),
+    ),
 }
 
 
@@ -61,6 +144,17 @@ class InstalledStatus:
 
 def _write(output: TextIO, text: str = "") -> None:
     print(text, file=output)
+
+
+def _render_step_artwork(output: TextIO, identifier: str) -> None:
+    """Afficher l'identité ASCII compacte d'une action du menu."""
+
+    title, artwork = STEP_ARTWORKS[identifier]
+    _write(output)
+    for line in artwork:
+        _write(output, f"{line:^{MENU_WIDTH}}")
+    _write(output, f"{title:^{MENU_WIDTH}}")
+    _write(output)
 
 
 def _prompt(
@@ -134,7 +228,10 @@ def _render_main_menu(output: TextIO, status: InstalledStatus) -> None:
     vision = status.vision_version or (
         "détectée" if VISION_ENVIRONMENT_PATH.exists() else "absente"
     )
-    width = 72
+    width = MENU_WIDTH
+    for line in OHANA_WORDMARK:
+        _write(output, f"{line:^{width}}" if line else "")
+    _write(output)
     _write(output, "┌" + "─" * (width - 2) + "┐")
     _write(output, f"│{'Ohana Installer ' + __version__:^70}│")
     _write(output, "├" + "─" * (width - 2) + "┤")
@@ -167,21 +264,47 @@ def _manage_capabilities(
 ) -> int | None:
     """Afficher les actions explicites sur les capacités d'INFRA-01."""
 
-    _write(output)
+    _render_step_artwork(output, "capabilities")
+    try:
+        statuses = {status.identifier: status for status in local_capability_statuses()}
+        dhcp = statuses["dhcp"]
+        time_reference = statuses["time-reference"]
+    except (CapabilityProvisioningError, KeyError) as error:
+        _write(output, f"✕ Diagnostic des capacités impossible : {error}")
+        return 3
+
     _write(output, "Capacités d INFRA-01")
     _write(output, "─" * 72)
-    _write(output, "  1. Afficher le diagnostic")
-    _write(output, "  2. Activer la capacité DHCP")
-    _write(output, "  3. Désactiver la capacité DHCP")
-    _write(output, "  4. Activer la référence temporelle")
-    _write(output, "  5. Désactiver la référence temporelle")
+    _write(output, f"  DHCP ({dhcp.implementation}) : {dhcp.state}")
+    _write(
+        output,
+        f"  Référence temporelle ({time_reference.implementation}) : {time_reference.state}",
+    )
+    _write(output)
+    actions: dict[str, tuple[str, CapabilityStatus]] = {
+        "1": (
+            "deactivate" if dhcp.active else "activate",
+            dhcp,
+        ),
+        "2": (
+            "deactivate" if time_reference.active else "activate",
+            time_reference,
+        ),
+    }
+    for menu_choice, (action, status) in actions.items():
+        verb = "Désactiver" if action == "deactivate" else "Activer"
+        label = "DHCP" if status.identifier == "dhcp" else "la référence temporelle"
+        _write(output, f"  {menu_choice}. {verb} {label}")
     _write(output, "  0. Retour")
     choice = _prompt(input_function, output, "Votre choix")
     if choice in {"0", "q", "Q"}:
         return None
-    if choice == "1":
-        return command_runner(["capability", "status"])
-    if choice == "2":
+    if choice not in actions:
+        _write(output, "Choix invalide.")
+        return 0
+
+    action, status = actions[choice]
+    if status.identifier == "dhcp" and action == "activate":
         _write(output)
         _write(output, "⚠ Un seul serveur DHCP doit être actif sur le réseau.")
         _write(output)
@@ -198,15 +321,8 @@ def _manage_capabilities(
             _write(output, "Activation DHCP annulée.")
             return 0
         return command_runner(["capability", "activate", "dhcp", "--yes"])
-    actions = {
-        "3": ("deactivate", "dhcp"),
-        "4": ("activate", "time-reference"),
-        "5": ("deactivate", "time-reference"),
-    }
-    if choice not in actions:
-        _write(output, "Choix invalide.")
-        return 0
-    action, identifier = actions[choice]
+
+    identifier = status.identifier
     verb = "Activer" if action == "activate" else "Désactiver"
     if not _ask_yes_no(input_function, output, f"{verb} la capacité {identifier} ?"):
         _write(output, "Action annulée.")
@@ -222,7 +338,7 @@ def _restore_infra_01(
 ) -> int | None:
     """Collecter uniquement les paramètres non secrets de restauration."""
 
-    _write(output)
+    _render_step_artwork(output, "restore")
     _write(output, "Restaurer INFRA-01")
     _write(output, "─" * 72)
     _write(output, "  1. Restaurer la dernière sauvegarde iCloud valide")
@@ -235,16 +351,17 @@ def _restore_infra_01(
     if choice not in {"1", "2", "3"}:
         _write(output, "Choix invalide.")
         return 0
-    identity = _prompt(
-        input_function,
-        output,
-        "Identité privée age (clé USB ou support sécurisé)",
-    )
-    if not identity:
-        _write(output, "L'identité age est obligatoire.")
-        return 0
-    arguments = ["restore", "--identity", identity]
+    arguments = ["restore"]
     if choice == "3":
+        identity = _prompt(
+            input_function,
+            output,
+            "Identité privée age (clé USB ou support sécurisé)",
+        )
+        if not identity:
+            _write(output, "L'identité age est obligatoire.")
+            return 0
+        arguments.extend(("--identity", identity))
         directory = _prompt(input_function, output, "Dossier de sauvegarde")
         if not directory:
             _write(output, "Le dossier de sauvegarde est obligatoire.")
@@ -291,20 +408,28 @@ def _select_release(
     input_function: InputFunction,
     output: TextIO,
 ) -> PlatformReleaseEntry | None:
+    _render_step_artwork(output, "composition")
     with tempfile.TemporaryDirectory(prefix="ohana-installer-menu-") as directory:
         catalog = download_release_catalog(Path(directory))
 
-    releases = tuple(
+    supported_releases = tuple(
         release
         for release in catalog.releases
         if release.platform_version != catalog.default_platform_version
+        and release.status == "supported"
     )
+    releases = supported_releases[:SUPPORTED_RELEASE_MENU_LIMIT]
     if not releases:
-        _write(output, "Aucune composition antérieure n'est publiée dans le catalogue.")
+        _write(output, "Aucune composition antérieure supportée n'est publiée.")
+        _write(
+            output,
+            "Les compositions historiques restent utilisables pour restaurer "
+            "une sauvegarde existante.",
+        )
         return None
 
     _write(output)
-    _write(output, "Compositions Agent/Vision antérieures")
+    _write(output, f"Compositions Agent/Vision antérieures supportées ({len(releases)})")
     _write(output, "─" * 72)
     for index, release in enumerate(releases, start=1):
         label = STATUS_LABELS[release.status]
@@ -314,6 +439,10 @@ def _select_release(
             f"Agent {release.agent_version:<8} Vision {release.vision_version:<8} "
             f"{label}",
         )
+    _write(
+        output,
+        "Les compositions historiques restent utilisables pour restaurer une sauvegarde existante.",
+    )
     _write(output, " 0. Retour")
 
     while True:
@@ -491,6 +620,7 @@ def _configure_network(
     input_function: InputFunction,
     output: TextIO,
 ) -> int | None:
+    _render_step_artwork(output, "network")
     try:
         state = read_network_state()
         pending = state.get("pending_change")
@@ -542,11 +672,24 @@ def run(
     """Afficher le menu principal jusqu'à ce que l'utilisateur le quitte."""
     input_reader = input_function or input
     destination = output or sys.stdout
+    identity_checked = False
 
     while True:
         status = _installed_status()
+        identity_warning = None
+        if status.installation_present and os.name == "posix" and not identity_checked:
+            try:
+                ensure_local_identity()
+            except AgeIdentityError as error:
+                identity_warning = str(error)
+            identity_checked = True
         _clear_terminal(destination)
         _render_main_menu(destination, status)
+        if identity_warning is not None:
+            _write(
+                destination,
+                f"⚠ Préparation de l'identité age incomplète : {identity_warning}",
+            )
         try:
             choice = _prompt(input_reader, destination, "Votre choix")
         except (EOFError, KeyboardInterrupt):
@@ -554,7 +697,15 @@ def run(
             return 0
 
         if choice == "1":
+            _render_step_artwork(destination, "install")
             result = command_runner(["install"])
+            if result == 0 and os.name == "posix":
+                try:
+                    ensure_local_identity()
+                    identity_checked = True
+                except AgeIdentityError as error:
+                    _write(destination, f"⚠ Identité age non préparée : {error}")
+                    result = 3
             _pause(input_reader, destination)
             if result not in {0, 3}:
                 return result
@@ -569,6 +720,7 @@ def run(
                 if result not in {0, 3}:
                     return result
         elif choice == "3":
+            _render_step_artwork(destination, "update")
             result = command_runner(["update"])
             _pause(input_reader, destination)
             if result not in {0, 3}:
@@ -602,6 +754,7 @@ def run(
             if result is not None:
                 _pause(input_reader, destination)
         elif choice == "7":
+            _render_step_artwork(destination, "automatic-update")
             try:
                 action = "disable" if automatic_update_is_enabled() else "enable"
             except AutomaticUpdateError:
@@ -611,6 +764,7 @@ def run(
             if result not in {0, 3}:
                 return result
         elif choice in {"8", "q", "Q"}:
+            _render_step_artwork(destination, "quit")
             _write(destination, "Au revoir.")
             return 0
         else:

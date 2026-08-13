@@ -224,6 +224,7 @@ def test_install_platform_uses_saved_component_pair_for_fresh_machine(
             "1.12.7",
             "--vision-version",
             "1.11.8",
+            "--defer-age-identity",
         )
     ]
 

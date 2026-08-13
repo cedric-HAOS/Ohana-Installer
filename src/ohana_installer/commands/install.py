@@ -16,6 +16,11 @@ from ohana_installer.administration import (
     prepare_administration,
     supports_network_administration,
 )
+from ohana_installer.age_identity import AgeIdentityError, ensure_local_identity
+from ohana_installer.configuration_migrations import (
+    ConfigurationMigrationError,
+    migrate_backup_configuration,
+)
 from ohana_installer.confirmation import confirm_action
 from ohana_installer.environment import EnvironmentCheck, run_environment_checks
 from ohana_installer.github import (
@@ -128,6 +133,7 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Accepter automatiquement les confirmations.",
     )
+    parser.add_argument("--defer-age-identity", action="store_true", help=argparse.SUPPRESS)
     add_release_selection_arguments(parser)
     parser.add_argument(
         "--network-interface",
@@ -794,6 +800,12 @@ def run(args: argparse.Namespace) -> int:
                         f"{CONFIGURATION_FILE_MODE:04o})."
                     )
 
+            if migrate_backup_configuration():
+                print(
+                    "✓ /etc/ohana-agent/plugins/backup.yaml migré vers "
+                    "l'identité age gérée."
+                )
+
             print()
             print("Préparation de l'administration graphique...")
 
@@ -891,6 +903,12 @@ def run(args: argparse.Namespace) -> int:
                     print(f"✗ {status.service_name} est {status.status}.")
                     return INSTALLATION_ERROR
 
+            if not args.defer_age_identity:
+                print()
+                print("Préparation de l'identité de sauvegarde INFRA-01...")
+                recipient = ensure_local_identity()
+                print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
+
     except SystemdCommandError as error:
         print(f"✗ Commande systemd impossible : {error}")
         return INSTALLATION_ERROR
@@ -908,6 +926,8 @@ def run(args: argparse.Namespace) -> int:
         return INSTALLATION_ERROR
     except (
         CapabilityProvisioningError,
+        AgeIdentityError,
+        ConfigurationMigrationError,
         PackageInstallationError,
         RcloneInstallationError,
     ) as error:

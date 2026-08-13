@@ -43,6 +43,10 @@ from ohana_installer.commands.install import (
     _reload_systemd,
     _start_services,
 )
+from ohana_installer.configuration_migrations import (
+    ConfigurationMigrationError,
+    migrate_backup_configuration,
+)
 from ohana_installer.confirmation import confirm_action
 from ohana_installer.environment import run_environment_checks
 from ohana_installer.github import (
@@ -471,6 +475,13 @@ def run(args: argparse.Namespace) -> int:
                 allow_downgrade=allow_downgrade,
             )
 
+        if migrate_backup_configuration():
+            print()
+            print(
+                "✓ /etc/ohana-agent/plugins/backup.yaml migré vers "
+                "l'identité age gérée."
+            )
+
         print()
         print("Téléchargement du catalogue et du manifeste officiels...")
 
@@ -768,6 +779,7 @@ def run(args: argparse.Namespace) -> int:
         return UPDATE_ERROR
     except (
         CapabilityProvisioningError,
+        ConfigurationMigrationError,
         PackageInstallationError,
         RcloneInstallationError,
     ) as error:

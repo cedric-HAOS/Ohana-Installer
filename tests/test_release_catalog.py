@@ -42,7 +42,7 @@ VALID_CATALOG = {
             "release_tag": "v1.0.20",
             "agent_version": "1.10.0",
             "vision_version": "1.9.0",
-            "status": "supported",
+            "status": "legacy",
         },
     ],
 }
@@ -121,6 +121,7 @@ def test_select_catalog_release_by_platform_version() -> None:
 
     assert release.agent_version == "1.10.0"
     assert release.vision_version == "1.9.0"
+    assert release.status == "legacy"
 
 
 def test_select_catalog_release_by_pair_prefers_default_when_duplicated() -> None:
