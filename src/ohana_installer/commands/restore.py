@@ -7,6 +7,8 @@ import getpass
 import shutil
 import subprocess
 import tempfile
+from collections.abc import Callable
+from datetime import datetime
 from pathlib import Path
 
 from ohana_installer.age_identity import (
@@ -26,11 +28,16 @@ from ohana_installer.restore import (
     install_platform,
     latest_local_backup,
     list_remote_backup_ids,
+    list_remote_manifests,
     rclone_read_bytes,
     require_tmpfs,
     select_remote_manifest,
 )
-from ohana_installer.restore_manifest import RestoreManifestError, parse_restore_manifest
+from ohana_installer.restore_manifest import (
+    RestoreManifest,
+    RestoreManifestError,
+    parse_restore_manifest,
+)
 
 RESTORE_ERROR = 3
 DEFAULT_REMOTE = "icloud:Ohana/Backups/infra-01"
@@ -52,7 +59,16 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
         action="store_true",
         help="Récupérer la sauvegarde depuis iCloud avec rclone.",
     )
-    parser.add_argument("--backup-id", help="Sauvegarde précise ; dernière valide par défaut.")
+    selection = parser.add_mutually_exclusive_group()
+    selection.add_argument(
+        "--backup-id",
+        help="Sauvegarde précise ; dernière valide par défaut.",
+    )
+    selection.add_argument(
+        "--choose-backup",
+        action="store_true",
+        help="Afficher les sauvegardes iCloud valides et en choisir une.",
+    )
     parser.add_argument(
         "--identity",
         type=Path,
@@ -88,6 +104,70 @@ def _temporary_icloud_config(args: argparse.Namespace, runtime: Path) -> Path:
     return config_path
 
 
+def _display_backup_date(value: str) -> str:
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return value
+    return parsed.strftime("%d/%m/%Y %H:%M UTC")
+
+
+def _choose_remote_manifest(
+    backup_ids: tuple[str, ...],
+    *,
+    manifest_reader: Callable[[str], bytes],
+    input_function: Callable[[str], str] = input,
+) -> tuple[RestoreManifest, bytes] | None:
+    available = list_remote_manifests(
+        backup_ids,
+        manifest_reader=manifest_reader,
+    )
+    print("Sauvegardes INFRA-01 valides disponibles dans iCloud :")
+    for index, (manifest, _content) in enumerate(available, start=1):
+        platform = manifest.platform_version or "composition historique"
+        print(
+            f"  {index}. {_display_backup_date(manifest.created_at)} — "
+            f"Platform {platform} — Agent {manifest.agent_version} / "
+            f"Vision {manifest.vision_version} — {manifest.backup_id}"
+        )
+    print("  0. Annuler")
+    while True:
+        choice = input_function("Votre choix : ").strip()
+        if choice in {"0", "q", "Q"}:
+            return None
+        try:
+            selected = int(choice)
+        except ValueError:
+            print("Choix invalide.")
+            continue
+        if 1 <= selected <= len(available):
+            return available[selected - 1]
+        print("Choix invalide.")
+
+
+def _select_icloud_manifest(
+    backup_ids: tuple[str, ...],
+    *,
+    choose_backup: bool,
+    requested_id: str | None,
+    manifest_reader: Callable[[str], bytes],
+    input_function: Callable[[str], str] = input,
+) -> tuple[RestoreManifest, bytes] | None:
+    if not backup_ids:
+        raise RestoreError("Aucune sauvegarde INFRA-01 n'est disponible dans iCloud.")
+    if choose_backup:
+        return _choose_remote_manifest(
+            backup_ids,
+            manifest_reader=manifest_reader,
+            input_function=input_function,
+        )
+    return select_remote_manifest(
+        backup_ids,
+        requested_id=requested_id,
+        manifest_reader=manifest_reader,
+    )
+
+
 def run(args: argparse.Namespace) -> int:
     """Exécuter une restauration locale ou iCloud."""
 
@@ -112,15 +192,23 @@ def run(args: argparse.Namespace) -> int:
                     rclone_config=rclone_config,
                     remote=args.remote,
                 )
-                manifest, manifest_bytes = select_remote_manifest(
-                    backup_ids,
-                    requested_id=args.backup_id,
-                    manifest_reader=lambda backup_id: rclone_read_bytes(
+                def manifest_reader(backup_id: str) -> bytes:
+                    return rclone_read_bytes(
                         f"{args.remote.rstrip('/')}/{backup_id}/manifest.json",
                         rclone_binary=RCLONE_BINARY,
                         rclone_config=rclone_config,
-                    ),
+                    )
+
+                selected = _select_icloud_manifest(
+                    backup_ids,
+                    choose_backup=bool(args.choose_backup),
+                    requested_id=args.backup_id,
+                    manifest_reader=manifest_reader,
                 )
+                if selected is None:
+                    print("Restauration annulée.")
+                    return 0
+                manifest, manifest_bytes = selected
                 remote_directory = f"{args.remote.rstrip('/')}/{manifest.backup_id}"
 
             if args.local is not None:

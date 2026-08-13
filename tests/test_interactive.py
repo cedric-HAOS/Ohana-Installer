@@ -11,6 +11,7 @@ import pytest
 
 from ohana_installer.interactive import (
     MENU_WIDTH,
+    OHANA_WORDMARK,
     STEP_ARTWORKS,
     InstalledStatus,
     _is_downgrade,
@@ -86,8 +87,13 @@ def test_interactive_menu_quits_without_command(
     assert " ___  _   _    _    _   _    _" in rendered
     assert "/ _ \\| | | |  / \\  | \\ | |  / \\" in rendered
     assert "I N S T A L L E R" in rendered
-    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.1")
-    assert "Ohana Installer 1.9.1" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.2")
+    assert "Ohana Installer 1.9.2" in rendered
+    rendered_lines = rendered.splitlines()
+    logo_lines = rendered_lines[:5]
+    expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:5]))) // 2
+    assert all(line.startswith(" " * expected_padding) for line in logo_lines)
+    assert [line[expected_padding:] for line in logo_lines] == list(OHANA_WORDMARK[:5])
     assert "Configurer le réseau" in rendered
     assert "FIN DE SESSION" in rendered
 
@@ -408,6 +414,27 @@ def test_interactive_builds_local_restore_command(
             "E:/Ohana/Backups",
         )
     ]
+
+
+def test_interactive_defers_icloud_backup_choice_to_restore_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = io.StringIO()
+    monkeypatch.setattr(
+        "ohana_installer.interactive._installed_status",
+        lambda: InstalledStatus(None, None, False),
+    )
+    commands: list[Sequence[str]] = []
+
+    result = run(
+        command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
+        input_function=ScriptedInput(["2", "2", "", "", "8"]),
+        output=output,
+    )
+
+    assert result == 0
+    assert commands == [("restore", "--icloud", "--choose-backup")]
+    assert "Identifiant de sauvegarde" not in output.getvalue()
 
 
 def test_prefix_from_mask_rejects_non_contiguous_mask() -> None:

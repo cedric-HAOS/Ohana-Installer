@@ -137,6 +137,27 @@ def select_remote_manifest(
     raise RestoreError("Aucune sauvegarde iCloud complète et valide n'est disponible.")
 
 
+def list_remote_manifests(
+    backup_ids: Sequence[str],
+    *,
+    manifest_reader: Callable[[str], bytes],
+) -> tuple[tuple[RestoreManifest, bytes], ...]:
+    """Lister les sauvegardes iCloud valides, de la plus récente à la plus ancienne."""
+
+    available: list[tuple[RestoreManifest, bytes]] = []
+    for backup_id in reversed(backup_ids):
+        try:
+            content = manifest_reader(backup_id)
+            manifest = parse_restore_manifest(content)
+        except (RestoreError, RestoreManifestError):
+            continue
+        if manifest.backup_id == backup_id:
+            available.append((manifest, content))
+    if not available:
+        raise RestoreError("Aucune sauvegarde INFRA-01 valide n'est disponible dans iCloud.")
+    return tuple(available)
+
+
 def list_remote_backup_ids(
     *,
     rclone_binary: Path,

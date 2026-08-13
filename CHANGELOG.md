@@ -6,6 +6,25 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.2] — Sélection des sauvegardes iCloud — 2026-08-13
+
+## Ajouté
+
+- Le choix d'une sauvegarde iCloud affiche désormais les sauvegardes INFRA-01
+  valides, de la plus récente à la plus ancienne, avec date, versions et
+  identifiant technique, puis propose une sélection numérotée.
+- Les parcours « dernière sauvegarde » et « choisir une sauvegarde » indiquent
+  explicitement lorsqu'aucune sauvegarde INFRA-01 n'est disponible dans iCloud.
+
+## Corrigé
+
+- Le mot-symbole Ohana est centré comme un bloc unique : ses cinq lignes
+  partagent désormais la même origine horizontale dans le terminal.
+
+## Validation
+
+- 284 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.9.1] — Identité age pendant la mise à jour directe — 2026-08-13
 
 ## Corrigé

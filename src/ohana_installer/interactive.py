@@ -65,6 +65,7 @@ OHANA_WORDMARK = (
     "",
     "I N S T A L L E R",
 )
+OHANA_LOGO_LINE_COUNT = 5
 STEP_ARTWORKS = {
     "install": (
         "INSTALLATION",
@@ -229,8 +230,13 @@ def _render_main_menu(output: TextIO, status: InstalledStatus) -> None:
         "détectée" if VISION_ENVIRONMENT_PATH.exists() else "absente"
     )
     width = MENU_WIDTH
-    for line in OHANA_WORDMARK:
-        _write(output, f"{line:^{width}}" if line else "")
+    logo_lines = OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT]
+    logo_width = max(map(len, logo_lines))
+    logo_padding = " " * ((width - logo_width) // 2)
+    for line in logo_lines:
+        _write(output, logo_padding + line)
+    _write(output)
+    _write(output, f"{OHANA_WORDMARK[-1]:^{width}}")
     _write(output)
     _write(output, "┌" + "─" * (width - 2) + "┐")
     _write(output, f"│{'Ohana Installer ' + __version__:^70}│")
@@ -370,11 +376,7 @@ def _restore_infra_01(
     else:
         arguments.append("--icloud")
         if choice == "2":
-            backup_id = _prompt(input_function, output, "Identifiant de sauvegarde")
-            if not backup_id:
-                _write(output, "L'identifiant de sauvegarde est obligatoire.")
-                return 0
-            arguments.extend(("--backup-id", backup_id))
+            arguments.append("--choose-backup")
         apple_id = _prompt(input_function, output, "Apple ID")
         if apple_id:
             arguments.extend(("--apple-id", apple_id))

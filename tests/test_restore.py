@@ -10,6 +10,10 @@ from pathlib import Path
 
 import pytest
 
+from ohana_installer.commands.restore import (
+    _choose_remote_manifest,
+    _select_icloud_manifest,
+)
 from ohana_installer.icloud import TemporaryICloudSession
 from ohana_installer.restore import (
     RestoreError,
@@ -18,6 +22,7 @@ from ohana_installer.restore import (
     apply_staged_configuration,
     install_platform,
     latest_local_backup,
+    list_remote_manifests,
     select_remote_manifest,
 )
 from ohana_installer.restore_manifest import (
@@ -164,6 +169,62 @@ def test_remote_selection_skips_newer_incomplete_backup() -> None:
     )
 
     assert manifest.backup_id == older_id
+
+
+@pytest.mark.parametrize("choose_backup", (False, True))
+def test_icloud_selection_reports_when_no_backup_exists(choose_backup: bool) -> None:
+    with pytest.raises(
+        RestoreError,
+        match="Aucune sauvegarde INFRA-01 n'est disponible dans iCloud",
+    ):
+        _select_icloud_manifest(
+            (),
+            choose_backup=choose_backup,
+            requested_id=None,
+            manifest_reader=lambda _backup_id: pytest.fail("Aucun manifeste à lire."),
+        )
+
+
+def test_icloud_choice_lists_valid_backups_and_selects_by_number(
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    newer = json.loads(_manifest())
+    newer["backup_id"] = "20260814T120000Z"
+    newer["created_at"] = "2026-08-14T12:00:00Z"
+    newer["platform_version"] = "1.0.53"
+    newer["archive"]["filename"] = "20260814T120000Z.tar.age"
+    older = json.loads(_manifest())
+    older["backup_id"] = "20260813T120000Z"
+
+    manifests = {
+        "20260813T120000Z": json.dumps(older).encode(),
+        "20260814T120000Z": json.dumps(newer).encode(),
+    }
+    selected = _choose_remote_manifest(
+        tuple(manifests),
+        manifest_reader=manifests.__getitem__,
+        input_function=lambda _prompt: "2",
+    )
+
+    assert selected is not None
+    assert selected[0].backup_id == "20260813T120000Z"
+    output = capsys.readouterr().out
+    assert "14/08/2026 12:00 UTC" in output
+    assert "Platform 1.0.53" in output
+    assert "Agent 1.12.7 / Vision 1.11.8" in output
+
+
+def test_remote_manifest_listing_ignores_invalid_entries() -> None:
+    available = list_remote_manifests(
+        ("20260812T120000Z", "20260813T120000Z"),
+        manifest_reader=lambda backup_id: (
+            _manifest() if backup_id == "20260813T120000Z" else b"invalid"
+        ),
+    )
+
+    assert [manifest.backup_id for manifest, _content in available] == [
+        "20260813T120000Z"
+    ]
 
 
 def test_temporary_icloud_session_completes_two_factor(tmp_path: Path) -> None:
