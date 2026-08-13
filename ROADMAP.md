@@ -6,6 +6,17 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# Version 1.8.0 — Capacités et restauration d'INFRA-01
+
+**Statut : terminée.**
+
+* [x] Provisionner dnsmasq, Chrony et age depuis le profil Platform.
+* [x] Séparer installation, restauration, capacités et réseau dans le menu.
+* [x] Restaurer une sauvegarde locale ou iCloud sans staging persistant.
+* [x] Réinstaller la composition Agent/Vision exacte de la sauvegarde.
+* [x] Valider et appliquer les fichiers avec retour arrière atomique.
+* [x] Conserver le DHCP inactif jusqu'à une activation explicite.
+
 # Version 1.7.3 — Installation rclone inter-systèmes
 
 **Statut : terminée.**

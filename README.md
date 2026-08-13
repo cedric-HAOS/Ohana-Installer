@@ -41,14 +41,16 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.7.3** fournit une interface interactive et six commandes explicites :
+La version **1.8.0** fournit une interface interactive et huit commandes explicites :
 
 ```text
 ohana
 ohana versions
 ohana install
+ohana restore
 ohana update
 ohana network
+ohana capability
 ohana automatic-update
 ohana uninstall
 ```
@@ -62,18 +64,21 @@ sudo ohana
 ```
 
 ```text
-1. Installer ou mettre à jour Agent et Vision
-2. Installer une composition antérieure
-3. Configurer le réseau d’INFRA-01
-4. Mise à jour automatique : désactivée
-5. Quitter
+1. Installer une nouvelle machine INFRA-01
+2. Restaurer INFRA-01
+3. Mettre à jour une installation Ohana
+4. Installer une composition antérieure
+5. Gérer les capacités d’INFRA-01
+6. Configurer le réseau d’INFRA-01
+7. Mise à jour automatique : désactivée
+8. Quitter
 ```
 
-Le premier choix installe la composition recommandée sur une machine neuve et
-met à jour une plateforme existante. Le deuxième choix charge dynamiquement le
-catalogue Platform et affiche les couples antérieurs sélectionnables. Le troisième
-modifie uniquement NetworkManager, sans télécharger ni réinstaller Agent ou Vision.
-Le quatrième active ou désactive un timer systemd quotidien de mise à jour.
+L'installation neuve, la mise à jour et la gestion des capacités sont volontairement
+séparées. Le profil `infra-01` déclaré par Platform provisionne dnsmasq pour la
+capacité DHCP et Chrony pour la référence temporelle. dnsmasq reste arrêté jusqu'à
+une activation explicite ; Chrony est configuré, validé puis activé. La configuration
+réseau reste une opération indépendante qui ne réinstalle aucun composant.
 
 ## Mise à jour automatique
 
@@ -107,6 +112,7 @@ réalise automatiquement :
 
 * la vérification de l'environnement ;
 * la lecture du catalogue officiel publié par Ohana-Platform ;
+* le provisionnement des capacités système du profil INFRA-01 ;
 * la vérification SHA-256 et le téléchargement des releases officielles ;
 * l'installation d'Ohana-Agent ;
 * l'installation d'Ohana-Vision ;
@@ -117,6 +123,60 @@ réalise automatiquement :
 Le manifeste vérifié est affiché avant toute modification. L'installation demande
 ensuite une confirmation, négative par défaut. Sans sélecteur, la composition
 recommandée par la dernière release Platform est utilisée.
+
+## Restauration d'INFRA-01
+
+Une sauvegarde locale peut être restaurée avec :
+
+```bash
+sudo ohana restore \
+  --local /media/usb/infra-01-20260813T040000Z \
+  --identity /media/usb/ohana-infra-01.agekey
+```
+
+Installer peut également retrouver la sauvegarde la plus récente dans iCloud :
+
+```bash
+sudo ohana restore \
+  --icloud \
+  --identity /media/usb/ohana-infra-01.agekey
+```
+
+La clé privée `age` doit être conservée hors d'INFRA-01. Pour iCloud, Installer
+demande l'identifiant Apple, le mot de passe et, si nécessaire, le code 2FA dans
+une session rclone temporaire. Les archives, la configuration rclone et les
+fichiers déchiffrés restent dans `/run`, qui doit être un `tmpfs` : aucune copie
+intermédiaire n'est écrite sur la carte microSD.
+
+Installer vérifie le manifeste, la taille et le SHA-256 du fichier chiffré,
+refuse les chemins non autorisés dans l'archive, installe la composition exacte
+Agent/Vision sauvegardée, puis restaure les configurations et la base Vision de
+manière atomique. Agent, Vision et Chrony sont redémarrés après validation.
+Le DHCP restauré reste inactif jusqu'à une activation explicite avec
+`ohana capability activate dhcp`.
+
+## Capacités d'INFRA-01
+
+Afficher leur état :
+
+```bash
+sudo ohana capability status
+```
+
+Une capacité possède un état distinct : absente, installée, configurée ou active.
+La mise en production du DHCP reste volontairement séparée de son installation :
+
+```bash
+sudo ohana capability activate dhcp
+```
+
+L'Installer rappelle qu'un seul serveur DHCP doit être actif et demande :
+`L'ancien serveur DHCP a-t-il été désactivé ?`. Il valide ensuite la configuration
+avec `dnsmasq --test` avant d'activer le service. Le retour arrière local est :
+
+```bash
+sudo ohana capability deactivate dhcp
+```
 
 ## Choix du couple Agent/Vision
 
@@ -147,7 +207,7 @@ jamais un couple Agent/Vision arbitraire.
 
 ## Configuration réseau
 
-La configuration réseau peut être réalisée depuis le choix 3 du menu interactif.
+La configuration réseau peut être réalisée depuis le choix 6 du menu interactif.
 Les valeurs actives sont préremplies et le formulaire accepte un préfixe CIDR ou
 un masque décimal, par exemple `24` ou `255.255.255.0`. La nouvelle configuration
 est appliquée avec un retour automatique de 180 secondes tant qu’elle n’est pas
@@ -315,7 +375,7 @@ nécessite donc aucune nouvelle version de l'Installer.
 
 # Compatibilité
 
-La version 1.7.3 cible les environnements Linux utilisant **systemd**. Les
+La version 1.8.0 cible les environnements Linux utilisant **systemd**. Les
 unités créent aussi les répertoires d'état persistants d'Agent et Vision sous
 `/var/lib`, avec un accès limité au compte de service.
 
@@ -329,7 +389,7 @@ La composition recommandée validée par `config/release-manifest.yaml` est :
 * Ohana-Vision 1.10.0.
 
 `config/release-catalog.yaml` contient toutes les compositions officiellement
-sélectionnables par Installer 1.7.3.
+sélectionnables par Installer 1.8.0.
 
 Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
 DHCP, WireGuard, Télémétrie Home Assistant et Z-Wave. Le manifeste détermine également

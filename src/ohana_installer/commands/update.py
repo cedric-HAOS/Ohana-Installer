@@ -71,6 +71,11 @@ from ohana_installer.release_selection import (
     selection_from_args,
 )
 from ohana_installer.system_account import SystemAccountError
+from ohana_installer.system_capabilities import (
+    CapabilityProvisioningError,
+    profile_requires_provisioning,
+    provision_profile,
+)
 from ohana_installer.systemd import (
     GeneratedSystemdService,
     InstalledSystemdService,
@@ -499,7 +504,9 @@ def run(args: argparse.Namespace) -> int:
                 installed_components,
             )
 
-            if versions_are_current and if_needed:
+            profile_needs_provisioning = profile_requires_provisioning(manifest.profile)
+
+            if versions_are_current and not profile_needs_provisioning and if_needed:
                 print()
                 print("✓ Ohana-Installer, Ohana-Agent et Ohana-Vision sont déjà à jour.")
                 print("Aucun service n'a été redémarré.")
@@ -542,6 +549,20 @@ def run(args: argparse.Namespace) -> int:
                 return 0
 
             print()
+            if manifest.profile is not None:
+                print(f"Réconciliation du profil {manifest.profile.name}...")
+                provisioned_capabilities = provision_profile(manifest.profile)
+                for provisioned in provisioned_capabilities:
+                    capability = provisioned.capability
+                    package_status = "installé" if provisioned.package_created else "déjà présent"
+                    state = (
+                        "activation gérée séparément"
+                        if capability.activation == "explicit"
+                        else "active"
+                    )
+                    print(f"✓ {capability.name} : {capability.package} {package_status}, {state}.")
+                print()
+
             print("Téléchargement des composants...")
 
             if components_to_update:
@@ -752,7 +773,11 @@ def run(args: argparse.Namespace) -> int:
     except ManifestError as error:
         print(f"✗ Le manifeste officiel est invalide : {error}")
         return UPDATE_ERROR
-    except (PackageInstallationError, RcloneInstallationError) as error:
+    except (
+        CapabilityProvisioningError,
+        PackageInstallationError,
+        RcloneInstallationError,
+    ) as error:
         print(f"✗ Mise à jour impossible : {error}")
         return UPDATE_ERROR
     except ConfigurationInstallationError as error:

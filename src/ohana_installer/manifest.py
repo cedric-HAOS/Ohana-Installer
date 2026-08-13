@@ -14,6 +14,7 @@ GITHUB_REPOSITORY_PATTERN = re.compile(
     r"[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?/"
     r"[A-Za-z0-9](?:[A-Za-z0-9_.-]*[A-Za-z0-9])?"
 )
+IDENTIFIER_PATTERN = re.compile(r"[a-z0-9](?:[a-z0-9-]*[a-z0-9])?")
 
 
 class ManifestError(ValueError):
@@ -87,6 +88,28 @@ class CompatibilityManifest:
 
 
 @dataclass(frozen=True)
+class SystemCapability:
+    """Implémentation système d'une capacité fournie par un profil."""
+
+    identifier: str
+    name: str
+    implementation: str
+    package: str
+    service: str
+    activation: str
+
+
+@dataclass(frozen=True)
+class InstallationProfile:
+    """Profil de machine provisionné par Ohana-Installer."""
+
+    identifier: str
+    name: str
+    capabilities: tuple[SystemCapability, ...]
+    utilities: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class PlatformManifest:
     """Manifeste validé d'une release Ohana-Platform."""
 
@@ -96,6 +119,7 @@ class PlatformManifest:
     runtime: RuntimeManifest
     components: tuple[ComponentManifest, ...]
     compatibility: CompatibilityManifest
+    profile: InstallationProfile | None = None
 
 
 def load_manifest(path: Path | str) -> PlatformManifest:
@@ -153,6 +177,7 @@ def parse_manifest(raw_manifest: Any) -> PlatformManifest:
     runtime = _parse_runtime(root.get("runtime"))
     components = _parse_components(root.get("components"))
     compatibility = _parse_compatibility(root.get("compatibility"))
+    profile = _parse_profile(root.get("profile")) if root.get("profile") is not None else None
 
     return PlatformManifest(
         schema_version=schema_version,
@@ -161,6 +186,60 @@ def parse_manifest(raw_manifest: Any) -> PlatformManifest:
         runtime=runtime,
         components=components,
         compatibility=compatibility,
+        profile=profile,
+    )
+
+
+def _parse_profile(raw_profile: Any) -> InstallationProfile:
+    """Valider le profil système optionnel de la plateforme."""
+
+    profile = _require_mapping(raw_profile, "profile")
+    identifier = _require_identifier(profile, "id", "profile")
+    raw_utilities = profile.get("utilities", [])
+    if not isinstance(raw_utilities, list):
+        raise ManifestError("profile.utilities doit être une liste.")
+    utilities: list[str] = []
+    for index, raw_utility in enumerate(raw_utilities):
+        if not isinstance(raw_utility, str) or not raw_utility.strip():
+            raise ManifestError(f"profile.utilities[{index}] doit être un identifiant non vide.")
+        utility = raw_utility.strip()
+        if utility in utilities:
+            raise ManifestError(f"profile.utilities contient un doublon : {utility}.")
+        utilities.append(utility)
+    raw_capabilities = _require_mapping(profile.get("capabilities"), "profile.capabilities")
+    if not raw_capabilities:
+        raise ManifestError("profile.capabilities ne peut pas être vide.")
+
+    capabilities: list[SystemCapability] = []
+    for raw_identifier, raw_capability in raw_capabilities.items():
+        if not isinstance(raw_identifier, str) or not raw_identifier.strip():
+            raise ManifestError("Chaque capacité doit posséder un identifiant non vide.")
+        capability_identifier = raw_identifier.strip()
+        path = f"profile.capabilities.{capability_identifier}"
+        capability = _require_mapping(raw_capability, path)
+        activation = _require_non_empty_string(capability, "activation", path)
+        if activation not in {"automatic", "explicit"}:
+            raise ManifestError(f"{path}.activation doit être 'automatic' ou 'explicit'.")
+        service = _require_non_empty_string(capability, "service", path)
+        if Path(service).name != service or not service.endswith(".service"):
+            raise ManifestError(f"{path}.service doit être un simple nom d'unité .service.")
+        package = _require_identifier(capability, "package", path)
+        capabilities.append(
+            SystemCapability(
+                identifier=capability_identifier,
+                name=_require_non_empty_string(capability, "name", path),
+                implementation=_require_identifier(capability, "implementation", path),
+                package=package,
+                service=service,
+                activation=activation,
+            )
+        )
+
+    return InstallationProfile(
+        identifier=identifier,
+        name=_require_non_empty_string(profile, "name", "profile"),
+        capabilities=tuple(capabilities),
+        utilities=tuple(utilities),
     )
 
 
@@ -455,6 +534,19 @@ def _require_non_empty_string(
         raise ManifestError(f"{path}.{key} doit être une chaîne de caractères non vide.")
 
     return value.strip()
+
+
+def _require_identifier(
+    mapping: dict[str, Any],
+    key: str,
+    path: str,
+) -> str:
+    value = _require_non_empty_string(mapping, key, path)
+    if IDENTIFIER_PATTERN.fullmatch(value) is None:
+        raise ManifestError(
+            f"{path}.{key} doit être un identifiant en minuscules séparé par des tirets."
+        )
+    return value
 
 
 def _require_integer(

@@ -55,6 +55,10 @@ from ohana_installer.system_account import (
     SystemAccountError,
     ensure_system_account,
 )
+from ohana_installer.system_capabilities import (
+    CapabilityProvisioningError,
+    provision_profile,
+)
 from ohana_installer.systemd import (
     GeneratedSystemdService,
     InstalledSystemdService,
@@ -208,6 +212,17 @@ def _display_manifest(manifest: PlatformManifest) -> None:
 
     for component in manifest.components:
         print(f"✓ {component.name} {component.version}")
+
+    if manifest.profile is not None:
+        print()
+        print(f"Profil système : {manifest.profile.name} ({manifest.profile.identifier})")
+        for capability in manifest.profile.capabilities:
+            activation = (
+                "activation explicite"
+                if capability.activation == "explicit"
+                else "activation automatique"
+            )
+            print(f"✓ {capability.name} — {capability.implementation} ({activation})")
 
 
 def _component_version(manifest: PlatformManifest, identifier: str) -> str:
@@ -673,6 +688,19 @@ def run(args: argparse.Namespace) -> int:
                 return 0
 
             print()
+            if manifest.profile is not None:
+                print(f"Provisionnement du profil {manifest.profile.name}...")
+                provisioned_capabilities = provision_profile(manifest.profile)
+                for provisioned in provisioned_capabilities:
+                    capability = provisioned.capability
+                    package_status = "installé" if provisioned.package_created else "déjà présent"
+                    if capability.activation == "explicit":
+                        state = "activation gérée séparément"
+                    else:
+                        state = "active"
+                    print(f"✓ {capability.name} : {capability.package} {package_status}, {state}.")
+                print()
+
             print("Téléchargement des composants...")
 
             downloaded_components = _download_components(
@@ -867,7 +895,11 @@ def run(args: argparse.Namespace) -> int:
     except ManifestError as error:
         print(f"✗ Le manifeste officiel est invalide : {error}")
         return INSTALLATION_ERROR
-    except (PackageInstallationError, RcloneInstallationError) as error:
+    except (
+        CapabilityProvisioningError,
+        PackageInstallationError,
+        RcloneInstallationError,
+    ) as error:
         print(f"✗ Installation impossible : {error}")
         return INSTALLATION_ERROR
     except ConfigurationInstallationError as error:
@@ -885,6 +917,17 @@ def run(args: argparse.Namespace) -> int:
 
     print()
     print("Ohana-Agent et Ohana-Vision sont installés, configurés, activés et démarrés.")
+    if manifest.profile is not None:
+        explicit = tuple(
+            capability
+            for capability in manifest.profile.capabilities
+            if capability.activation == "explicit"
+        )
+        for capability in explicit:
+            print(
+                f"La capacité {capability.name} n'est pas activée automatiquement. "
+                f"Activez-la avec : ohana capability activate {capability.identifier}"
+            )
 
     return 0
 

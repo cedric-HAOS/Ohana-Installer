@@ -25,6 +25,27 @@ VALID_MANIFEST = {
             "minimum_version": "3.12",
         },
     },
+    "profile": {
+        "id": "infra-01",
+        "name": "INFRA-01",
+        "utilities": ["age"],
+        "capabilities": {
+            "dhcp": {
+                "name": "Attribution des adresses IP",
+                "implementation": "dnsmasq",
+                "package": "dnsmasq",
+                "service": "dnsmasq.service",
+                "activation": "explicit",
+            },
+            "time-reference": {
+                "name": "Référence temporelle",
+                "implementation": "chrony",
+                "package": "chrony",
+                "service": "chrony.service",
+                "activation": "automatic",
+            },
+        },
+    },
     "components": {
         "agent": {
             "name": "Ohana-Agent",
@@ -107,6 +128,13 @@ def test_parse_manifest_returns_validated_manifest() -> None:
     assert manifest.runtime.minimum_python_version == "3.12"
     assert manifest.compatibility.operating_system_family == "Linux"
     assert manifest.compatibility.service_manager == "systemd"
+    assert manifest.profile is not None
+    assert manifest.profile.identifier == "infra-01"
+    assert manifest.profile.utilities == ("age",)
+    assert tuple(capability.identifier for capability in manifest.profile.capabilities) == (
+        "dhcp",
+        "time-reference",
+    )
 
     assert len(manifest.components) == 2
     assert manifest.components[0].identifier == "agent"
@@ -205,6 +233,24 @@ def test_parse_manifest_rejects_empty_components() -> None:
         ManifestError,
         match="components ne peut pas être vide",
     ):
+        parse_manifest(raw_manifest)
+
+
+def test_parse_manifest_rejects_unsafe_capability_activation() -> None:
+    raw_manifest = {
+        **VALID_MANIFEST,
+        "profile": {
+            **VALID_MANIFEST["profile"],
+            "capabilities": {
+                "dhcp": {
+                    **VALID_MANIFEST["profile"]["capabilities"]["dhcp"],
+                    "activation": "immediate",
+                }
+            },
+        },
+    }
+
+    with pytest.raises(ManifestError, match=r"automatic.*explicit"):
         parse_manifest(raw_manifest)
 
 
@@ -358,6 +404,15 @@ def test_repository_manifest_is_valid() -> None:
         "agent",
         "vision",
     }
+    assert manifest.profile is not None
+    assert manifest.profile.identifier == "infra-01"
+    assert tuple(
+        (capability.identifier, capability.package, capability.activation)
+        for capability in manifest.profile.capabilities
+    ) == (
+        ("dhcp", "dnsmasq", "explicit"),
+        ("time-reference", "chrony", "automatic"),
+    )
 
     agent = next(component for component in manifest.components if component.identifier == "agent")
     vision = next(

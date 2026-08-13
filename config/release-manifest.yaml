@@ -8,6 +8,26 @@ runtime:
   python:
     minimum_version: "3.13"
 
+profile:
+  id: infra-01
+  name: INFRA-01
+  utilities:
+    - age
+  capabilities:
+    dhcp:
+      name: Attribution des adresses IP
+      implementation: dnsmasq
+      package: dnsmasq
+      service: dnsmasq.service
+      activation: explicit
+
+    time-reference:
+      name: Référence temporelle
+      implementation: chrony
+      package: chrony
+      service: chrony.service
+      activation: automatic
+
 components:
   agent:
     name: Ohana-Agent

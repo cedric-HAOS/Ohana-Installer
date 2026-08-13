@@ -46,13 +46,13 @@ def test_interactive_menu_quits_without_command(
 
     result = run(
         command_runner=lambda arguments: commands.append(arguments) or 0,
-        input_function=ScriptedInput(["5"]),
+        input_function=ScriptedInput(["8"]),
         output=output,
     )
 
     assert result == 0
     assert commands == []
-    assert "Ohana Installer 1.7.3" in output.getvalue()
+    assert "Ohana Installer 1.8.0" in output.getvalue()
     assert "Configurer le réseau" in output.getvalue()
 
 
@@ -68,7 +68,7 @@ def test_interactive_recommended_installs_on_empty_machine(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["1", "", "5"]),
+        input_function=ScriptedInput(["1", "", "8"]),
         output=output,
     )
 
@@ -76,7 +76,7 @@ def test_interactive_recommended_installs_on_empty_machine(
     assert commands == [("install",)]
 
 
-def test_interactive_recommended_updates_existing_installation(
+def test_interactive_update_is_a_distinct_menu_action(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     output = io.StringIO()
@@ -88,7 +88,7 @@ def test_interactive_recommended_updates_existing_installation(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["1", "", "5"]),
+        input_function=ScriptedInput(["3", "", "8"]),
         output=output,
     )
 
@@ -134,7 +134,7 @@ def test_interactive_selects_catalog_release_and_allows_downgrade(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["2", "1", "o", "", "5"]),
+        input_function=ScriptedInput(["4", "1", "o", "", "8"]),
         output=output,
     )
 
@@ -223,12 +223,64 @@ def test_interactive_network_confirms_transaction(
 
     result = run(
         command_runner=lambda _arguments: 0,
-        input_function=ScriptedInput(["3", "o", "o", "", "5"]),
+        input_function=ScriptedInput(["6", "o", "o", "", "8"]),
         output=output,
     )
 
     assert result == 0
     assert confirmations == ["a" * 32]
+
+
+def test_interactive_dhcp_activation_uses_generic_previous_server_wording(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = io.StringIO()
+    monkeypatch.setattr(
+        "ohana_installer.interactive._installed_status",
+        lambda: InstalledStatus("1.12.7", "1.11.8", True),
+    )
+    commands: list[Sequence[str]] = []
+
+    result = run(
+        command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
+        input_function=ScriptedInput(["5", "2", "o", "", "8"]),
+        output=output,
+    )
+
+    assert result == 0
+    assert commands == [("capability", "activate", "dhcp", "--yes")]
+    assert "L'ancien serveur DHCP a-t-il été désactivé ?" in output.getvalue()
+    assert "Freebox" not in output.getvalue()
+
+
+def test_interactive_builds_local_restore_command(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    output = io.StringIO()
+    monkeypatch.setattr(
+        "ohana_installer.interactive._installed_status",
+        lambda: InstalledStatus(None, None, False),
+    )
+    commands: list[Sequence[str]] = []
+
+    result = run(
+        command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
+        input_function=ScriptedInput(
+            ["2", "3", "E:/Ohana/infra-01.agekey", "E:/Ohana/Backups", "", "8"]
+        ),
+        output=output,
+    )
+
+    assert result == 0
+    assert commands == [
+        (
+            "restore",
+            "--identity",
+            "E:/Ohana/infra-01.agekey",
+            "--local",
+            "E:/Ohana/Backups",
+        )
+    ]
 
 
 def test_prefix_from_mask_rejects_non_contiguous_mask() -> None:

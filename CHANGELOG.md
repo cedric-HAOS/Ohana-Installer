@@ -6,6 +6,31 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.8.0] — Capacités et restauration d'INFRA-01 — 2026-08-13
+
+## Ajouté
+
+- Le profil Platform provisionne les capacités DHCP avec dnsmasq et référence
+  temporelle avec Chrony, ainsi que l'utilitaire `age`.
+- Le menu distingue installation, restauration, mise à jour, capacités et
+  configuration réseau.
+- La commande `ohana restore` reconstruit INFRA-01 depuis une sauvegarde locale
+  ou iCloud et réinstalle la composition Agent/Vision sauvegardée.
+- La restauration vérifie la taille, le SHA-256, le périmètre des chemins et la
+  correspondance entre le manifeste public et le descripteur chiffré.
+
+## Sécurité
+
+- Les traitements temporaires sont refusés hors `tmpfs`.
+- L'application des fichiers est atomique avec retour arrière si dnsmasq ou
+  Chrony refuse la configuration restaurée.
+- Le DHCP reste inactif après restauration et exige la confirmation que
+  l'ancien serveur DHCP a été désactivé.
+
+## Validation
+
+- 269 tests réussis, Ruff, manifeste Platform et contrats validés.
+
 # [1.7.3] — Installation rclone inter-systèmes — 2026-08-11
 
 ## Corrigé

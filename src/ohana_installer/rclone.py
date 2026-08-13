@@ -31,6 +31,8 @@ class RcloneInstallationError(RuntimeError):
 
 def ensure_rclone(
     destination: Path = RCLONE_INSTALLATION_PATH,
+    *,
+    temporary_directory: Path | None = None,
 ) -> str:
     """Install and verify the pinned rclone release when needed."""
     if _installed_version(destination) == RCLONE_VERSION:
@@ -45,7 +47,12 @@ def ensure_rclone(
     filename = f"rclone-v{RCLONE_VERSION}-{asset_platform}.zip"
     url = f"https://downloads.rclone.org/v{RCLONE_VERSION}/{filename}"
     try:
-        with tempfile.TemporaryDirectory(prefix="ohana-rclone-") as temporary:
+        if temporary_directory is not None:
+            temporary_directory.mkdir(parents=True, exist_ok=True)
+        with tempfile.TemporaryDirectory(
+            prefix="ohana-rclone-",
+            dir=temporary_directory,
+        ) as temporary:
             archive = Path(temporary) / filename
             _download(url, archive, expected_sha256)
             with ZipFile(archive) as bundle:

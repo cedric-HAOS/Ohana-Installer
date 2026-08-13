@@ -146,22 +146,122 @@ def _render_main_menu(output: TextIO, status: InstalledStatus) -> None:
     except AutomaticUpdateError:
         automatic_update = "indisponible"
     for line in (
-        "  1. Installer ou mettre à jour Agent et Vision",
-        "  2. Installer une composition antérieure",
-        "  3. Configurer le réseau d INFRA-01",
-        f"  4. Mise à jour automatique : {automatic_update}",
-        "  5. Quitter",
+        "  1. Installer une nouvelle machine INFRA-01",
+        "  2. Restaurer INFRA-01 depuis une sauvegarde",
+        "  3. Mettre à jour une installation Ohana",
+        "  4. Installer une composition antérieure",
+        "  5. Gérer les capacités d INFRA-01",
+        "  6. Configurer le réseau d INFRA-01",
+        f"  7. Mise à jour automatique : {automatic_update}",
+        "  8. Quitter",
     ):
         _write(output, f"│{line:<70}│")
     _write(output, "└" + "─" * (width - 2) + "┘")
 
 
-def _run_recommended(
+def _manage_capabilities(
+    *,
     command_runner: CommandRunner,
-    status: InstalledStatus,
-) -> int:
-    command = "update" if status.installation_present else "install"
-    return command_runner([command])
+    input_function: InputFunction,
+    output: TextIO,
+) -> int | None:
+    """Afficher les actions explicites sur les capacités d'INFRA-01."""
+
+    _write(output)
+    _write(output, "Capacités d INFRA-01")
+    _write(output, "─" * 72)
+    _write(output, "  1. Afficher le diagnostic")
+    _write(output, "  2. Activer la capacité DHCP")
+    _write(output, "  3. Désactiver la capacité DHCP")
+    _write(output, "  4. Activer la référence temporelle")
+    _write(output, "  5. Désactiver la référence temporelle")
+    _write(output, "  0. Retour")
+    choice = _prompt(input_function, output, "Votre choix")
+    if choice in {"0", "q", "Q"}:
+        return None
+    if choice == "1":
+        return command_runner(["capability", "status"])
+    if choice == "2":
+        _write(output)
+        _write(output, "⚠ Un seul serveur DHCP doit être actif sur le réseau.")
+        _write(output)
+        _write(
+            output,
+            "Avant de poursuivre, désactivez le serveur DHCP actuellement en "
+            "service (box Internet, routeur, autre serveur ou autre machine).",
+        )
+        if not _ask_yes_no(
+            input_function,
+            output,
+            "L'ancien serveur DHCP a-t-il été désactivé ?",
+        ):
+            _write(output, "Activation DHCP annulée.")
+            return 0
+        return command_runner(["capability", "activate", "dhcp", "--yes"])
+    actions = {
+        "3": ("deactivate", "dhcp"),
+        "4": ("activate", "time-reference"),
+        "5": ("deactivate", "time-reference"),
+    }
+    if choice not in actions:
+        _write(output, "Choix invalide.")
+        return 0
+    action, identifier = actions[choice]
+    verb = "Activer" if action == "activate" else "Désactiver"
+    if not _ask_yes_no(input_function, output, f"{verb} la capacité {identifier} ?"):
+        _write(output, "Action annulée.")
+        return 0
+    return command_runner(["capability", action, identifier, "--yes"])
+
+
+def _restore_infra_01(
+    *,
+    command_runner: CommandRunner,
+    input_function: InputFunction,
+    output: TextIO,
+) -> int | None:
+    """Collecter uniquement les paramètres non secrets de restauration."""
+
+    _write(output)
+    _write(output, "Restaurer INFRA-01")
+    _write(output, "─" * 72)
+    _write(output, "  1. Restaurer la dernière sauvegarde iCloud valide")
+    _write(output, "  2. Choisir une sauvegarde iCloud")
+    _write(output, "  3. Restaurer depuis un dossier local")
+    _write(output, "  0. Retour")
+    choice = _prompt(input_function, output, "Votre choix")
+    if choice in {"0", "q", "Q"}:
+        return None
+    if choice not in {"1", "2", "3"}:
+        _write(output, "Choix invalide.")
+        return 0
+    identity = _prompt(
+        input_function,
+        output,
+        "Identité privée age (clé USB ou support sécurisé)",
+    )
+    if not identity:
+        _write(output, "L'identité age est obligatoire.")
+        return 0
+    arguments = ["restore", "--identity", identity]
+    if choice == "3":
+        directory = _prompt(input_function, output, "Dossier de sauvegarde")
+        if not directory:
+            _write(output, "Le dossier de sauvegarde est obligatoire.")
+            return 0
+        arguments.extend(("--local", directory))
+    else:
+        arguments.append("--icloud")
+        if choice == "2":
+            backup_id = _prompt(input_function, output, "Identifiant de sauvegarde")
+            if not backup_id:
+                _write(output, "L'identifiant de sauvegarde est obligatoire.")
+                return 0
+            arguments.extend(("--backup-id", backup_id))
+        apple_id = _prompt(input_function, output, "Apple ID")
+        if apple_id:
+            arguments.extend(("--apple-id", apple_id))
+    return command_runner(arguments)
 
 
 def _numeric_version(version: str) -> tuple[int, int, int] | None:
@@ -454,11 +554,26 @@ def run(
             return 0
 
         if choice == "1":
-            result = _run_recommended(command_runner, status)
+            result = command_runner(["install"])
             _pause(input_reader, destination)
             if result not in {0, 3}:
                 return result
         elif choice == "2":
+            result = _restore_infra_01(
+                command_runner=command_runner,
+                input_function=input_reader,
+                output=destination,
+            )
+            if result is not None:
+                _pause(input_reader, destination)
+                if result not in {0, 3}:
+                    return result
+        elif choice == "3":
+            result = command_runner(["update"])
+            _pause(input_reader, destination)
+            if result not in {0, 3}:
+                return result
+        elif choice == "4":
             result = _run_selected_release(
                 command_runner=command_runner,
                 input_function=input_reader,
@@ -469,14 +584,24 @@ def run(
                 _pause(input_reader, destination)
                 if result not in {0, 3}:
                     return result
-        elif choice == "3":
+        elif choice == "5":
+            result = _manage_capabilities(
+                command_runner=command_runner,
+                input_function=input_reader,
+                output=destination,
+            )
+            if result is not None:
+                _pause(input_reader, destination)
+                if result not in {0, 3}:
+                    return result
+        elif choice == "6":
             result = _configure_network(
                 input_function=input_reader,
                 output=destination,
             )
             if result is not None:
                 _pause(input_reader, destination)
-        elif choice == "4":
+        elif choice == "7":
             try:
                 action = "disable" if automatic_update_is_enabled() else "enable"
             except AutomaticUpdateError:
@@ -485,7 +610,7 @@ def run(
             _pause(input_reader, destination)
             if result not in {0, 3}:
                 return result
-        elif choice in {"5", "q", "Q"}:
+        elif choice in {"8", "q", "Q"}:
             _write(destination, "Au revoir.")
             return 0
         else:
