@@ -6,6 +6,21 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.4] — Restauration iCloud et alignement du logo — 2026-08-13
+
+## Corrigé
+
+- Le mot-symbole et son sous-titre sont alignés visuellement avec le centre du
+  cadre du menu, y compris lorsque leurs largeurs ont une parité différente.
+- Le menu de restauration ne demande plus inutilement l'Apple ID avant de
+  laisser la commande réutiliser la connexion iCloud existante.
+- L'absence du dossier distant des sauvegardes INFRA-01 est présentée comme une
+  absence de sauvegarde, sans exposer l'erreur technique `directory not found`.
+
+## Validation
+
+- 290 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.9.3] — Vérification au démarrage et connexion iCloud — 2026-08-13
 
 ## Modifié

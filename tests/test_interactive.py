@@ -121,13 +121,16 @@ def test_interactive_menu_quits_without_command(
     assert " ___  _   _    _    _   _    _" in rendered
     assert "/ _ \\| | | |  / \\  | \\ | |  / \\" in rendered
     assert "I N S T A L L E R" in rendered
-    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.3")
-    assert "Ohana Installer 1.9.3" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.4")
+    assert "Ohana Installer 1.9.4" in rendered
     rendered_lines = rendered.splitlines()
     logo_lines = rendered_lines[:5]
-    expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:5]))) // 2
+    expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:5])) + 1) // 2
     assert all(line.startswith(" " * expected_padding) for line in logo_lines)
     assert [line[expected_padding:] for line in logo_lines] == list(OHANA_WORDMARK[:5])
+    title_line = next(line for line in rendered_lines if "I N S T A L L E R" in line)
+    expected_title_padding = (MENU_WIDTH - len(OHANA_WORDMARK[-1]) + 1) // 2
+    assert title_line == " " * expected_title_padding + OHANA_WORDMARK[-1]
     assert "Configurer le réseau" in rendered
     assert "FIN DE SESSION" in rendered
 
@@ -450,8 +453,17 @@ def test_interactive_builds_local_restore_command(
     ]
 
 
-def test_interactive_defers_icloud_backup_choice_to_restore_command(
+@pytest.mark.parametrize(
+    ("restore_choice", "expected_command"),
+    (
+        ("1", ("restore", "--icloud")),
+        ("2", ("restore", "--icloud", "--choose-backup")),
+    ),
+)
+def test_interactive_defers_icloud_connection_and_choice_to_restore_command(
     monkeypatch: pytest.MonkeyPatch,
+    restore_choice: str,
+    expected_command: tuple[str, ...],
 ) -> None:
     output = io.StringIO()
     monkeypatch.setattr(
@@ -462,13 +474,15 @@ def test_interactive_defers_icloud_backup_choice_to_restore_command(
 
     result = run(
         command_runner=lambda arguments: commands.append(tuple(arguments)) or 0,
-        input_function=ScriptedInput(["2", "2", "", "", "8"]),
+        input_function=ScriptedInput(["2", restore_choice, "", "8"]),
         output=output,
     )
 
     assert result == 0
-    assert commands == [("restore", "--icloud", "--choose-backup")]
-    assert "Identifiant de sauvegarde" not in output.getvalue()
+    assert commands == [expected_command]
+    rendered = output.getvalue()
+    assert "Apple ID" not in rendered
+    assert "Identifiant de sauvegarde" not in rendered
 
 
 def test_prefix_from_mask_rejects_non_contiguous_mask() -> None:

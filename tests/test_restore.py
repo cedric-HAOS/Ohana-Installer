@@ -24,6 +24,7 @@ from ohana_installer.restore import (
     apply_staged_configuration,
     install_platform,
     latest_local_backup,
+    list_remote_backup_ids,
     list_remote_manifests,
     select_remote_manifest,
 )
@@ -267,6 +268,22 @@ def test_remote_manifest_listing_ignores_invalid_entries() -> None:
     assert [manifest.backup_id for manifest, _content in available] == [
         "20260813T120000Z"
     ]
+
+
+def test_missing_remote_backup_directory_means_no_backup(tmp_path: Path) -> None:
+    result = list_remote_backup_ids(
+        rclone_binary=Path("/usr/bin/rclone"),
+        rclone_config=tmp_path / "rclone.conf",
+        remote="icloud:Ohana/Backups/infra-01",
+        command_runner=lambda command, **kwargs: subprocess.CompletedProcess(
+            command,
+            3,
+            "",
+            "ERROR : error listing: directory not found",
+        ),
+    )
+
+    assert result == ()
 
 
 def test_temporary_icloud_session_completes_two_factor(tmp_path: Path) -> None:

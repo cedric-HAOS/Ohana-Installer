@@ -265,11 +265,13 @@ def _render_main_menu(output: TextIO, status: InstalledStatus) -> None:
     width = MENU_WIDTH
     logo_lines = OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT]
     logo_width = max(map(len, logo_lines))
-    logo_padding = " " * ((width - logo_width) // 2)
+    logo_padding = " " * ((width - logo_width + 1) // 2)
     for line in logo_lines:
         _write(output, logo_padding + line)
     _write(output)
-    _write(output, f"{OHANA_WORDMARK[-1]:^{width}}")
+    title = OHANA_WORDMARK[-1]
+    title_padding = " " * ((width - len(title) + 1) // 2)
+    _write(output, title_padding + title)
     _write(output)
     _write(output, "┌" + "─" * (width - 2) + "┐")
     _write(output, f"│{'Ohana Installer ' + __version__:^70}│")
@@ -410,9 +412,6 @@ def _restore_infra_01(
         arguments.append("--icloud")
         if choice == "2":
             arguments.append("--choose-backup")
-        apple_id = _prompt(input_function, output, "Apple ID")
-        if apple_id:
-            arguments.extend(("--apple-id", apple_id))
     return command_runner(arguments)
 
 

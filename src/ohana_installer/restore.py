@@ -184,6 +184,8 @@ def list_remote_backup_ids(
     )
     if result.returncode != 0:
         detail = (result.stderr or result.stdout or "erreur inconnue").strip()
+        if "directory not found" in detail.lower():
+            return ()
         raise RestoreError(f"Impossible de lister les sauvegardes iCloud : {detail}")
     return tuple(
         sorted(
