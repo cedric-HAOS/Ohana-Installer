@@ -285,7 +285,7 @@ def decrypt_and_extract(
 
     members: list[Path] = []
     try:
-        with tarfile.open(decrypted_tar, mode="r:") as archive:
+        with tarfile.open(decrypted_tar, mode="r:*") as archive:
             for member in archive:
                 relative = _safe_member_path(member)
                 archive.extract(member, path=extracted, filter="data")

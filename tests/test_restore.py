@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import io
 import json
 import subprocess
 import tarfile
@@ -22,6 +24,7 @@ from ohana_installer.restore import (
     _safe_member_path,
     _verify_and_remove_descriptor,
     apply_staged_configuration,
+    decrypt_and_extract,
     install_platform,
     latest_local_backup,
     list_remote_backup_ids,
@@ -32,6 +35,27 @@ from ohana_installer.restore_manifest import (
     RestoreManifestError,
     parse_restore_manifest,
 )
+
+
+class NonClosingBytesIO(io.BytesIO):
+    def close(self) -> None:
+        pass
+
+
+class PassthroughAgeProcess:
+    def __init__(self, command) -> None:
+        self.command = tuple(command)
+        self.stdin = NonClosingBytesIO()
+        self.input = self.stdin
+        self.returncode = 0
+
+    def communicate(self):
+        destination = Path(self.command[self.command.index("--output") + 1])
+        destination.write_bytes(self.input.getvalue())
+        return b"", b""
+
+    def kill(self) -> None:
+        self.returncode = -9
 
 
 def _manifest() -> bytes:
@@ -68,6 +92,47 @@ def test_parse_restore_manifest_rejects_unencrypted_archive() -> None:
 
     with pytest.raises(RestoreManifestError, match="age"):
         parse_restore_manifest(json.dumps(payload))
+
+
+def test_decrypt_and_extract_accepts_gzip_compressed_tar(tmp_path: Path) -> None:
+    descriptor = {
+        "schema_version": 1,
+        "backup_id": "20260813T120000Z",
+        "created_at": "2026-08-13T12:00:00Z",
+        "profile": "infra-01",
+        "platform_version": "1.0.50",
+        "agent_version": "1.12.7",
+        "vision_version": "1.11.8",
+    }
+    encrypted = io.BytesIO()
+    with tarfile.open(fileobj=encrypted, mode="w:gz") as archive:
+        config = b"enabled: true\n"
+        config_member = tarfile.TarInfo("etc/ohana-agent/shikamaru.yaml")
+        config_member.size = len(config)
+        archive.addfile(config_member, io.BytesIO(config))
+        descriptor_body = (json.dumps(descriptor) + "\n").encode()
+        descriptor_member = tarfile.TarInfo("ohana-backup/descriptor.json")
+        descriptor_member.size = len(descriptor_body)
+        archive.addfile(descriptor_member, io.BytesIO(descriptor_body))
+    encrypted_body = encrypted.getvalue()
+    payload = json.loads(_manifest())
+    payload["archive"]["size_bytes"] = len(encrypted_body)
+    payload["archive"]["sha256"] = hashlib.sha256(encrypted_body).hexdigest()
+    manifest = parse_restore_manifest(json.dumps(payload))
+    identity = tmp_path / "identity.agekey"
+    identity.write_text("AGE-SECRET-KEY-1TEST\n", encoding="utf-8")
+
+    members = decrypt_and_extract(
+        io.BytesIO(encrypted_body),
+        manifest=manifest,
+        identity_path=identity,
+        staging_directory=tmp_path / "restore",
+        popen_factory=lambda command, **_kwargs: PassthroughAgeProcess(command),
+    )
+
+    restored = tmp_path / "restore/payload/etc/ohana-agent/shikamaru.yaml"
+    assert restored.read_bytes() == b"enabled: true\n"
+    assert restored in members
 
 
 @pytest.mark.parametrize(
@@ -265,9 +330,7 @@ def test_remote_manifest_listing_ignores_invalid_entries() -> None:
         ),
     )
 
-    assert [manifest.backup_id for manifest, _content in available] == [
-        "20260813T120000Z"
-    ]
+    assert [manifest.backup_id for manifest, _content in available] == ["20260813T120000Z"]
 
 
 def test_missing_remote_backup_directory_means_no_backup(tmp_path: Path) -> None:

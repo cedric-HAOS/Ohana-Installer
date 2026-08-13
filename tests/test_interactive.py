@@ -155,8 +155,8 @@ def test_interactive_menu_quits_without_command(
     assert "  .--(   )--.    Ohana" in rendered
     assert " (    \\ /    )" in rendered
     assert "I N S T A L L E R" in rendered
-    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.6")
-    assert "Ohana Installer 1.9.6" in rendered
+    assert rendered.index("I N S T A L L E R") < rendered.index("Ohana Installer 1.9.7")
+    assert "Ohana Installer 1.9.7" in rendered
     rendered_lines = rendered.splitlines()
     logo_lines = rendered_lines[:OHANA_LOGO_LINE_COUNT]
     expected_padding = (MENU_WIDTH - max(map(len, OHANA_WORDMARK[:OHANA_LOGO_LINE_COUNT])) + 1) // 2

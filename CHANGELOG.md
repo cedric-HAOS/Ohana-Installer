@@ -6,6 +6,18 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.7] — Restauration des archives INFRA-01 compressées — 2026-08-13
+
+## Corrigé
+
+- La restauration détecte automatiquement les tar compressés produits par
+  Agent 1.14.3, tout en conservant la compatibilité avec les archives tar non
+  compressées antérieures.
+
+## Validation
+
+- 294 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.9.6] — Accès sauvegarde aux données Vision — 2026-08-13
 
 ## Corrigé
