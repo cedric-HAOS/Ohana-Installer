@@ -33,6 +33,28 @@ class ProvisionedCapability:
 
 
 @dataclass(frozen=True)
+class ProvisionedUtility:
+    """Résultat du provisionnement d'un utilitaire système."""
+
+    package: str
+    display_name: str
+    package_created: bool
+
+
+@dataclass(frozen=True)
+class ProfileProvisioningResult:
+    """Résultat complet du provisionnement d'un profil de machine."""
+
+    capabilities: tuple[ProvisionedCapability, ...] = ()
+    utilities: tuple[ProvisionedUtility, ...] = ()
+
+    def __iter__(self):
+        """Conserver l'itération historique sur les capacités."""
+
+        return iter(self.capabilities)
+
+
+@dataclass(frozen=True)
 class CapabilityStatus:
     """État local observable d'une capacité système."""
 
@@ -67,6 +89,10 @@ KNOWN_CAPABILITIES = {
 CONFIGURATION_PATHS = {
     "dhcp": Path("/etc/dnsmasq.d/00-ohana.conf"),
     "time-reference": Path("/etc/chrony/chrony.conf"),
+}
+
+UTILITY_DISPLAY_NAMES = {
+    "age": "Utilitaire de chiffrement",
 }
 
 CHRONY_CONFIGURATION = """\
@@ -139,11 +165,11 @@ def provision_profile(
     profile: InstallationProfile | None,
     *,
     command_runner: CommandRunner = subprocess.run,
-) -> tuple[ProvisionedCapability, ...]:
+) -> ProfileProvisioningResult:
     """Installer les capacités d'un profil avec une activation maîtrisée."""
 
     if profile is None:
-        return ()
+        return ProfileProvisioningResult()
 
     created = {
         capability.identifier: not package_is_installed(
@@ -160,6 +186,7 @@ def provision_profile(
         for utility in profile.utilities
         if not package_is_installed(utility, command_runner=command_runner)
     )
+    created_utilities = {utility: utility in missing_utilities for utility in profile.utilities}
     protected_services = tuple(capability.service for capability in missing)
 
     try:
@@ -216,7 +243,19 @@ def provision_profile(
                 command_runner=command_runner,
             )
 
-    return results
+    utilities = tuple(
+        ProvisionedUtility(
+            package=utility,
+            display_name=UTILITY_DISPLAY_NAMES.get(utility, "Utilitaire système"),
+            package_created=created_utilities[utility],
+        )
+        for utility in profile.utilities
+    )
+
+    return ProfileProvisioningResult(
+        capabilities=results,
+        utilities=utilities,
+    )
 
 
 def profile_requires_provisioning(

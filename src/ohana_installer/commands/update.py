@@ -29,6 +29,7 @@ from ohana_installer.commands.install import (
     _component_version,
     _display_check,
     _display_manifest,
+    _display_profile_provisioning,
     _download_components,
     _download_configurations,
     _enable_services,
@@ -551,16 +552,8 @@ def run(args: argparse.Namespace) -> int:
             print()
             if manifest.profile is not None:
                 print(f"Réconciliation du profil {manifest.profile.name}...")
-                provisioned_capabilities = provision_profile(manifest.profile)
-                for provisioned in provisioned_capabilities:
-                    capability = provisioned.capability
-                    package_status = "installé" if provisioned.package_created else "déjà présent"
-                    state = (
-                        "activation gérée séparément"
-                        if capability.activation == "explicit"
-                        else "active"
-                    )
-                    print(f"✓ {capability.name} : {capability.package} {package_status}, {state}.")
+                provisioning = provision_profile(manifest.profile)
+                _display_profile_provisioning(provisioning)
                 print()
 
             print("Téléchargement des composants...")

@@ -6,6 +6,15 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.8.1] — Visibilité de l'utilitaire age — 2026-08-13
+
+## Corrigé
+
+- Le manifeste affiché mentionne désormais les utilitaires requis par le
+  profil, notamment `age`.
+- Le résultat du provisionnement indique si chaque utilitaire a été installé
+  ou s'il était déjà présent.
+
 # [1.8.0] — Capacités et restauration d'INFRA-01 — 2026-08-13
 
 ## Ajouté

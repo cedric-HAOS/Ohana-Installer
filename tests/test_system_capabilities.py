@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from ohana_installer.commands.install import _display_profile_provisioning
 from ohana_installer.manifest import InstallationProfile, SystemCapability
 from ohana_installer.system_capabilities import (
     CONFIGURATION_PATHS,
@@ -65,6 +66,10 @@ def test_provision_profile_installs_packages_without_starting_dhcp(
     results = provision_profile(_profile(), command_runner=run_command)
 
     assert all(result.package_created for result in results)
+    assert len(results.utilities) == 1
+    assert results.utilities[0].package == "age"
+    assert results.utilities[0].display_name == "Utilitaire de chiffrement"
+    assert results.utilities[0].package_created is True
     assert (
         "/usr/bin/systemctl",
         "mask",
@@ -140,7 +145,7 @@ def test_provision_profile_preserves_an_existing_active_dhcp() -> None:
             )
         return subprocess.CompletedProcess(normalized, 0, "", "")
 
-    provision_profile(_profile(), command_runner=run_command)
+    results = provision_profile(_profile(), command_runner=run_command)
 
     assert (
         "/usr/bin/systemctl",
@@ -148,6 +153,27 @@ def test_provision_profile_preserves_an_existing_active_dhcp() -> None:
         "--now",
         "dnsmasq.service",
     ) not in commands
+    assert results.utilities[0].package_created is False
+
+
+def test_profile_provisioning_displays_existing_age(capsys) -> None:
+    def run_command(command, **_kwargs):
+        normalized = tuple(command)
+        if normalized[0].endswith("dpkg-query"):
+            return subprocess.CompletedProcess(
+                normalized,
+                0,
+                "install ok installed",
+                "",
+            )
+        return subprocess.CompletedProcess(normalized, 0, "", "")
+
+    result = provision_profile(_profile(), command_runner=run_command)
+
+    _display_profile_provisioning(result)
+
+    output = capsys.readouterr().out
+    assert "✓ Utilitaire de chiffrement : age déjà présent." in output
 
 
 def test_invalid_chrony_configuration_does_not_replace_existing_file(

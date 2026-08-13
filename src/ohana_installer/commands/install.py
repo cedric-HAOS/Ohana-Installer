@@ -56,7 +56,9 @@ from ohana_installer.system_account import (
     ensure_system_account,
 )
 from ohana_installer.system_capabilities import (
+    UTILITY_DISPLAY_NAMES,
     CapabilityProvisioningError,
+    ProfileProvisioningResult,
     provision_profile,
 )
 from ohana_installer.systemd import (
@@ -223,6 +225,22 @@ def _display_manifest(manifest: PlatformManifest) -> None:
                 else "activation automatique"
             )
             print(f"✓ {capability.name} — {capability.implementation} ({activation})")
+        for utility in manifest.profile.utilities:
+            display_name = UTILITY_DISPLAY_NAMES.get(utility, "Utilitaire système")
+            print(f"✓ {display_name} — {utility}")
+
+
+def _display_profile_provisioning(result: ProfileProvisioningResult) -> None:
+    """Afficher toutes les capacités et tous les utilitaires provisionnés."""
+
+    for provisioned in result.capabilities:
+        capability = provisioned.capability
+        package_status = "installé" if provisioned.package_created else "déjà présent"
+        state = "activation gérée séparément" if capability.activation == "explicit" else "actif"
+        print(f"✓ {capability.name} : {capability.package} {package_status}, {state}.")
+    for utility in result.utilities:
+        package_status = "installé" if utility.package_created else "déjà présent"
+        print(f"✓ {utility.display_name} : {utility.package} {package_status}.")
 
 
 def _component_version(manifest: PlatformManifest, identifier: str) -> str:
@@ -690,15 +708,8 @@ def run(args: argparse.Namespace) -> int:
             print()
             if manifest.profile is not None:
                 print(f"Provisionnement du profil {manifest.profile.name}...")
-                provisioned_capabilities = provision_profile(manifest.profile)
-                for provisioned in provisioned_capabilities:
-                    capability = provisioned.capability
-                    package_status = "installé" if provisioned.package_created else "déjà présent"
-                    if capability.activation == "explicit":
-                        state = "activation gérée séparément"
-                    else:
-                        state = "active"
-                    print(f"✓ {capability.name} : {capability.package} {package_status}, {state}.")
+                provisioning = provision_profile(manifest.profile)
+                _display_profile_provisioning(provisioning)
                 print()
 
             print("Téléchargement des composants...")

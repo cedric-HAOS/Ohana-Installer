@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from ohana_installer.commands.install import _display_manifest
 from ohana_installer.environment import MINIMUM_PYTHON_VERSION
 from ohana_installer.manifest import (
     ManifestError,
@@ -477,6 +478,14 @@ def test_repository_manifest_is_valid() -> None:
     assert tuple(
         configuration_file.source for configuration_file in vision.configuration.files
     ) == ("vision.example.yaml",)
+
+
+def test_repository_manifest_displays_age_utility(capsys) -> None:
+    manifest = load_manifest(Path("config/release-manifest.yaml"))
+
+    _display_manifest(manifest)
+
+    assert "✓ Utilitaire de chiffrement — age" in capsys.readouterr().out
 
 
 def test_repository_manifest_runtime_matches_installer() -> None:
