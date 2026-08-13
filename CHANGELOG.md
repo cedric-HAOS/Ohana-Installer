@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.9.6] — Accès sauvegarde aux données Vision — 2026-08-13
+
+## Corrigé
+
+- `ohana-agent.service` rejoint le groupe supplémentaire `ohana-vision` afin
+  que la sauvegarde INFRA-01 puisse lire la configuration et la base Vision,
+  sans rendre ces données accessibles aux autres comptes du système.
+- Une mise à jour manuelle réconcilie cette permission même lorsque les paquets
+  Agent et Vision utilisent déjà les versions recommandées.
+
+## Validation
+
+- 293 tests réussis, Ruff et contrôles de distribution validés.
+
 # [1.9.5] — Identité visuelle du terminal — 2026-08-13
 
 ## Corrigé

@@ -509,6 +509,7 @@ def test_render_systemd_service() -> None:
         "--mqtt-config /etc/ohana-agent/plugins/mqtt.yaml"
     ) in content
     assert "Restart=on-failure" in content
+    assert "SupplementaryGroups=ohana-vision" in content
     assert "RuntimeDirectory=ohana-agent" in content
     assert "RuntimeDirectoryMode=0750" in content
     assert "StateDirectory=ohana-agent" in content
@@ -516,6 +517,22 @@ def test_render_systemd_service() -> None:
     assert "NoNewPrivileges=false" in content
     assert "WantedBy=multi-user.target" in content
     assert content.endswith("\n")
+
+
+def test_vision_service_does_not_receive_agent_backup_group() -> None:
+    service = ComponentService(
+        filename="ohana-vision.service",
+        description="Ohana Vision",
+        user="ohana-vision",
+        group="ohana-vision",
+        working_directory=Path("/opt/ohana-vision"),
+        executable=Path("/opt/ohana-vision/venv/bin/ohana-vision"),
+        arguments=(),
+    )
+
+    content = render_systemd_service(service)
+
+    assert "SupplementaryGroups=" not in content
 
 
 def test_generate_component_service_writes_file(
