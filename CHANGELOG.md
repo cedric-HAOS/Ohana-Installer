@@ -6,6 +6,27 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.10.0] — Provisionnement TLS Katsuyu — 2026-08-20
+
+## Ajouté
+
+- À partir d'Agent 1.17.0, l'installation et la mise à jour provisionnent le
+  listener worker HTTPS dédié sur le port 8766.
+- Installer génère une autorité locale privée, un certificat serveur limité à
+  `infra-01.ohana.lan` et `192.168.1.10`, ainsi qu'un jeton worker distinct.
+
+## Sécurité
+
+- La clé de l'autorité reste accessible uniquement à root ; Agent ne reçoit
+  que le certificat public, son certificat serveur et sa clé de service.
+- Les permissions des secrets et du répertoire TLS sont réconciliées à chaque
+  installation, et des matériaux partiels provoquent un échec explicite.
+
+## Validation
+
+- 297 tests réussis, dont une validation OpenSSL réelle de la chaîne serveur,
+  Ruff et contrôles de distribution validés.
+
 # [1.9.7] — Restauration des archives INFRA-01 compressées — 2026-08-13
 
 ## Corrigé

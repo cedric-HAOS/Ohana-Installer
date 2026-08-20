@@ -2,8 +2,14 @@
 
 from __future__ import annotations
 
+import shutil
+import subprocess
 from pathlib import Path
 
+import pytest
+import yaml
+
+from ohana_installer import administration as administration_module
 from ohana_installer.administration import (
     DHCP_RELOAD_HELPER_PATH,
     DHCP_RELOAD_PATH_NAME,
@@ -365,3 +371,130 @@ administration:
     content = agent_configuration.read_text(encoding="utf-8")
     assert "  network:" not in content
     assert "  dhcp:\n    enabled: false" in content
+
+
+def test_prepare_administration_enables_jobs_with_a_dedicated_tls_listener(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    openssl = tmp_path / "openssl"
+    openssl.write_text("executable", encoding="utf-8")
+    tls_directory = agent_configuration.parent / "tls"
+
+    def fake_openssl(command: list[str]) -> None:
+        for option in ("-keyout", "-out"):
+            if option in command:
+                target = Path(command[command.index(option) + 1])
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"generated {target.name}", encoding="utf-8")
+
+    monkeypatch.setattr(administration_module, "_run_openssl", fake_openssl)
+
+    result = prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        systemd_directory=tmp_path / "systemd",
+        require_linux=False,
+        secure_ownership=False,
+        agent_version="1.17.0",
+        worker_token_path=agent_configuration.parent / "katsuyu.token",
+        worker_tls_directory=tls_directory,
+        openssl_path=openssl,
+    )
+
+    content = agent_configuration.read_text(encoding="utf-8")
+    parsed = yaml.safe_load(content)
+    assert result.jobs_enabled is True
+    assert result.worker_tls_enabled is True
+    assert "  jobs:\n    enabled: true" in content
+    assert "    worker_tls:\n      enabled: true" in content
+    assert "      host: 0.0.0.0\n      port: 8766" in content
+    assert (agent_configuration.parent / "katsuyu.token").stat().st_size > 32
+    assert (tls_directory / "ca.crt").is_file()
+    assert (tls_directory / "worker.crt").is_file()
+    assert parsed["administration"]["jobs"]["worker_tls"]["port"] == 8766
+
+
+def test_jobs_migration_preserves_existing_retention_and_replaces_only_tls(
+    tmp_path: Path,
+) -> None:
+    configuration = tmp_path / "shikamaru.yaml"
+    configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  host: 127.0.0.1
+  port: 8765
+  jobs:
+    enabled: false
+    database_path: /custom/jobs.db
+    worker_token_file: /old/token
+    retention_days: 7
+    max_active_jobs: 42
+    worker_tls:
+      enabled: false
+      port: 9999
+  dhcp:
+    enabled: true
+""",
+        encoding="utf-8",
+    )
+
+    administration_module._ensure_agent_jobs_section(
+        configuration,
+        worker_token_path=Path("/etc/ohana-agent/katsuyu.token"),
+        ca_certificate_path=Path("/etc/ohana-agent/tls/ca.crt"),
+        certificate_path=Path("/etc/ohana-agent/tls/worker.crt"),
+        private_key_path=Path("/etc/ohana-agent/tls/worker.key"),
+    )
+
+    content = configuration.read_text(encoding="utf-8")
+    assert "    enabled: true" in content
+    assert "    database_path: /custom/jobs.db" in content
+    assert "    retention_days: 7" in content
+    assert "    max_active_jobs: 42" in content
+    assert content.count("    worker_tls:") == 1
+    assert "      port: 8766" in content
+    assert "      port: 9999" not in content
+
+
+def test_generated_worker_certificate_is_a_valid_server_chain(tmp_path: Path) -> None:
+    openssl = shutil.which("openssl")
+    if openssl is None:
+        candidates = (
+            Path(r"C:\Program Files\Git\usr\bin\openssl.exe"),
+            Path(r"C:\Program Files\Git\mingw64\bin\openssl.exe"),
+        )
+        openssl = next((str(path) for path in candidates if path.is_file()), None)
+    if openssl is None:
+        pytest.skip("OpenSSL is unavailable")
+
+    paths = administration_module._prepare_worker_tls(
+        directory=tmp_path / "tls",
+        openssl_path=Path(openssl),
+        dns_name="infra-01.ohana.lan",
+        ip_address="192.168.1.10",
+        secure_ownership=False,
+    )
+    verified = subprocess.run(
+        [
+            openssl,
+            "verify",
+            "-purpose",
+            "sslserver",
+            "-CAfile",
+            str(paths["ca_certificate"]),
+            str(paths["certificate"]),
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert verified.returncode == 0, verified.stderr

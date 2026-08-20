@@ -253,6 +253,20 @@ NetworkManager, valide la règle `sudoers`, applique la connexion puis confirme
 la transaction locale. Les modifications ultérieures sont disponibles dans
 Vision, page **Configuration → Réseau Agent**.
 
+## Provisionnement Katsuyu HTTPS
+
+À partir d'une composition comprenant le contrat TLS worker d'Agent,
+l'installation et la mise à jour activent les jobs distribués et préparent
+automatiquement le listener HTTPS Katsuyu. L'Installer conserve le listener
+d'administration sur `127.0.0.1:8765`, génère un jeton worker distinct, une
+autorité locale et un certificat valable pour `infra-01.ohana.lan` et
+`192.168.1.10`. La clé de l'autorité reste lisible uniquement par `root`; Agent
+ne reçoit que les éléments nécessaires à son listener sur le port `8766`.
+
+Les fichiers existants sont réutilisés lors des mises à jour. Une autorité TLS
+partiellement présente provoque un arrêt explicite plutôt qu'une régénération
+qui invaliderait silencieusement la confiance enregistrée sur Bubule.
+
 ## Mise à jour
 
 La commande :

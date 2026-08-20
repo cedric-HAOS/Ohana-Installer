@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import secrets
 import shutil
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -27,6 +28,13 @@ AGENT_CONFIGURATION_DIRECTORY = Path("/etc/ohana-agent")
 AGENT_CONFIGURATION_PATH = AGENT_CONFIGURATION_DIRECTORY / "shikamaru.yaml"
 AGENT_INFRASTRUCTURE_PATH = AGENT_CONFIGURATION_DIRECTORY / "infrastructure.yaml"
 AGENT_TOKEN_PATH = AGENT_CONFIGURATION_DIRECTORY / "management.token"
+AGENT_WORKER_TOKEN_PATH = AGENT_CONFIGURATION_DIRECTORY / "katsuyu.token"
+AGENT_WORKER_TLS_DIRECTORY = AGENT_CONFIGURATION_DIRECTORY / "tls"
+AGENT_WORKER_CA_CERTIFICATE_PATH = AGENT_WORKER_TLS_DIRECTORY / "ca.crt"
+AGENT_WORKER_CA_PRIVATE_KEY_PATH = AGENT_WORKER_TLS_DIRECTORY / "ca.key"
+AGENT_WORKER_CERTIFICATE_PATH = AGENT_WORKER_TLS_DIRECTORY / "worker.crt"
+AGENT_WORKER_PRIVATE_KEY_PATH = AGENT_WORKER_TLS_DIRECTORY / "worker.key"
+OPENSSL_PATH = Path("/usr/bin/openssl")
 AGENT_PLUGIN_CONFIGURATION_FILENAMES = (
     "dns.yaml",
     "ntp.yaml",
@@ -55,6 +63,7 @@ DHCP_RELOAD_PATH_NAME = "ohana-dhcp-reload.path"
 DHCP_RELOAD_HELPER_PATH = Path("/opt/ohana-agent/venv/bin/ohana-agent-dhcp-reload-helper")
 NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
+DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
 
 
 class AdministrationPreparationError(RuntimeError):
@@ -69,6 +78,8 @@ class AdministrationPreparation:
     dhcp_enabled: bool
     token_created: bool
     network_enabled: bool = False
+    jobs_enabled: bool = False
+    worker_tls_enabled: bool = False
     units_installed: tuple[Path, ...] = ()
 
 
@@ -90,6 +101,11 @@ def prepare_administration(
     nmcli_path: Path = NMCLI_PATH,
     visudo_path: Path = VISUDO_PATH,
     agent_version: str | None = None,
+    worker_token_path: Path = AGENT_WORKER_TOKEN_PATH,
+    worker_tls_directory: Path = AGENT_WORKER_TLS_DIRECTORY,
+    openssl_path: Path = OPENSSL_PATH,
+    worker_dns_name: str = "infra-01.ohana.lan",
+    worker_ip_address: str = "192.168.1.10",
 ) -> AdministrationPreparation:
     """Configurer automatiquement les échanges d'administration locaux."""
     if require_linux and os.name != "posix":
@@ -98,6 +114,8 @@ def prepare_administration(
             dhcp_enabled=False,
             token_created=False,
             network_enabled=False,
+            jobs_enabled=False,
+            worker_tls_enabled=False,
         )
 
     required_paths = (
@@ -132,6 +150,7 @@ def prepare_administration(
 
     network_supported = supports_network_administration(agent_version)
     dhcp_lease_purge_supported = supports_dhcp_lease_purge(agent_version)
+    jobs_tls_supported = supports_distributed_jobs_tls(agent_version)
 
     _append_section_if_missing(
         agent_configuration_path,
@@ -149,6 +168,29 @@ def prepare_administration(
             token_path=vision_token_path,
         ),
     )
+
+    if jobs_tls_supported:
+        worker_token = _resolve_private_token(worker_token_path)
+        _write_token(
+            worker_token_path,
+            worker_token,
+            group_name="ohana-agent",
+            secure_ownership=secure_ownership,
+        )
+        worker_tls_paths = _prepare_worker_tls(
+            directory=worker_tls_directory,
+            openssl_path=openssl_path,
+            dns_name=worker_dns_name,
+            ip_address=worker_ip_address,
+            secure_ownership=secure_ownership,
+        )
+        _ensure_agent_jobs_section(
+            agent_configuration_path,
+            worker_token_path=worker_token_path,
+            ca_certificate_path=worker_tls_paths["ca_certificate"],
+            certificate_path=worker_tls_paths["certificate"],
+            private_key_path=worker_tls_paths["private_key"],
+        )
 
     if secure_ownership:
         _secure_mutable_path(
@@ -210,6 +252,8 @@ def prepare_administration(
         dhcp_enabled=dhcp_enabled,
         token_created=token_created,
         network_enabled=network_preparation.enabled,
+        jobs_enabled=jobs_tls_supported,
+        worker_tls_enabled=jobs_tls_supported,
         units_installed=installed_units,
     )
 
@@ -246,6 +290,14 @@ def _resolve_token(
             return token, False
 
     return secrets.token_urlsafe(48), True
+
+
+def _resolve_private_token(path: Path) -> str:
+    if path.is_file():
+        token = path.read_text(encoding="utf-8").strip()
+        if token:
+            return token
+    return secrets.token_urlsafe(48)
 
 
 def _write_token(
@@ -376,6 +428,268 @@ def _ensure_agent_network_section(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
+def _ensure_agent_jobs_section(
+    path: Path,
+    *,
+    worker_token_path: Path,
+    ca_certificate_path: Path,
+    certificate_path: Path,
+    private_key_path: Path,
+) -> None:
+    """Enable the existing jobs contract and own only its worker TLS subsection."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    administration_start = next(
+        (index for index, line in enumerate(lines) if line == "administration:"),
+        None,
+    )
+    if administration_start is None:
+        raise AdministrationPreparationError("La section administration Agent est absente.")
+    administration_end = _nested_section_end(
+        lines,
+        administration_start,
+        indentation=0,
+    )
+    jobs_start = next(
+        (
+            index
+            for index in range(administration_start + 1, administration_end)
+            if lines[index] == "  jobs:"
+        ),
+        None,
+    )
+    tls_block = [
+        "    worker_tls:",
+        "      enabled: true",
+        "      host: 0.0.0.0",
+        "      port: 8766",
+        f"      certificate_file: {certificate_path.as_posix()}",
+        f"      private_key_file: {private_key_path.as_posix()}",
+        f"      ca_certificate_file: {ca_certificate_path.as_posix()}",
+    ]
+    if jobs_start is None:
+        insertion_index = next(
+            (
+                index
+                for index in range(administration_start + 1, administration_end)
+                if lines[index] in {"  network:", "  dhcp:"}
+            ),
+            administration_end,
+        )
+        block = [
+            "  jobs:",
+            "    enabled: true",
+            "    database_path: /var/lib/ohana-agent/distributed-jobs.db",
+            f"    worker_token_file: {worker_token_path.as_posix()}",
+            "    lease_seconds: 60",
+            "    waiting_worker_after_seconds: 30",
+            "    retention_days: 30",
+            "    max_active_jobs: 1000",
+            *tls_block,
+        ]
+        lines[insertion_index:insertion_index] = block
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+        return
+
+    jobs_end = _nested_section_end(lines, jobs_start, indentation=2)
+    enabled_index = next(
+        (
+            index
+            for index in range(jobs_start + 1, jobs_end)
+            if lines[index].lstrip().startswith("enabled:")
+            and lines[index].startswith("    ")
+            and not lines[index].startswith("      ")
+        ),
+        None,
+    )
+    if enabled_index is None:
+        lines.insert(jobs_start + 1, "    enabled: true")
+        jobs_end += 1
+    else:
+        lines[enabled_index] = "    enabled: true"
+
+    token_index = next(
+        (
+            index
+            for index in range(jobs_start + 1, jobs_end)
+            if lines[index].strip().startswith("worker_token_file:")
+        ),
+        None,
+    )
+    if token_index is None:
+        lines.insert(jobs_end, f"    worker_token_file: {worker_token_path.as_posix()}")
+        jobs_end += 1
+    else:
+        lines[token_index] = f"    worker_token_file: {worker_token_path.as_posix()}"
+
+    tls_start = next(
+        (index for index in range(jobs_start + 1, jobs_end) if lines[index] == "    worker_tls:"),
+        None,
+    )
+    if tls_start is None:
+        lines[jobs_end:jobs_end] = tls_block
+    else:
+        tls_end = _nested_section_end(lines, tls_start, indentation=4)
+        lines[tls_start:tls_end] = tls_block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
+def _nested_section_end(lines: list[str], start: int, *, indentation: int) -> int:
+    for index in range(start + 1, len(lines)):
+        line = lines[index]
+        if not line.strip():
+            continue
+        current_indentation = len(line) - len(line.lstrip())
+        if current_indentation <= indentation:
+            return index
+    return len(lines)
+
+
+def _prepare_worker_tls(
+    *,
+    directory: Path,
+    openssl_path: Path,
+    dns_name: str,
+    ip_address: str,
+    secure_ownership: bool,
+) -> dict[str, Path]:
+    """Create the private Ohana CA and renewable Agent worker certificate once."""
+    paths = {
+        "ca_certificate": directory / "ca.crt",
+        "ca_private_key": directory / "ca.key",
+        "certificate": directory / "worker.crt",
+        "private_key": directory / "worker.key",
+        "request": directory / "worker.csr",
+        "serial": directory / "ca.srl",
+    }
+    durable = tuple(
+        paths[name]
+        for name in (
+            "ca_certificate",
+            "ca_private_key",
+            "certificate",
+            "private_key",
+        )
+    )
+    existing = [path for path in durable if path.exists()]
+    if existing and len(existing) != len(durable):
+        raise AdministrationPreparationError(
+            "La configuration TLS Katsuyu est incomplète ; aucune clé ne sera remplacée."
+        )
+    if not existing:
+        if not openssl_path.is_file():
+            raise AdministrationPreparationError(
+                f"OpenSSL est requis pour préparer Katsuyu : {openssl_path}."
+            )
+        directory.mkdir(parents=True, exist_ok=True)
+        commands = (
+            [
+                str(openssl_path),
+                "req",
+                "-x509",
+                "-newkey",
+                "rsa:3072",
+                "-sha256",
+                "-days",
+                "3650",
+                "-nodes",
+                "-subj",
+                "/CN=Ohana Local Worker CA",
+                "-addext",
+                "basicConstraints=critical,CA:TRUE,pathlen:0",
+                "-addext",
+                "keyUsage=critical,keyCertSign,cRLSign",
+                "-keyout",
+                str(paths["ca_private_key"]),
+                "-out",
+                str(paths["ca_certificate"]),
+            ],
+            [
+                str(openssl_path),
+                "req",
+                "-new",
+                "-newkey",
+                "rsa:3072",
+                "-sha256",
+                "-nodes",
+                "-subj",
+                f"/CN={dns_name}",
+                "-addext",
+                f"subjectAltName=DNS:{dns_name},IP:{ip_address}",
+                "-addext",
+                "basicConstraints=critical,CA:FALSE",
+                "-addext",
+                "keyUsage=critical,digitalSignature,keyEncipherment",
+                "-addext",
+                "extendedKeyUsage=serverAuth",
+                "-keyout",
+                str(paths["private_key"]),
+                "-out",
+                str(paths["request"]),
+            ],
+            [
+                str(openssl_path),
+                "x509",
+                "-req",
+                "-in",
+                str(paths["request"]),
+                "-CA",
+                str(paths["ca_certificate"]),
+                "-CAkey",
+                str(paths["ca_private_key"]),
+                "-CAcreateserial",
+                "-days",
+                "825",
+                "-sha256",
+                "-copy_extensions",
+                "copy",
+                "-out",
+                str(paths["certificate"]),
+            ],
+        )
+        try:
+            for command in commands:
+                _run_openssl(command)
+        except Exception:
+            for candidate in paths.values():
+                candidate.unlink(missing_ok=True)
+            raise
+        paths["request"].unlink(missing_ok=True)
+
+    if secure_ownership:
+        _secure_mutable_path(directory, group_name="ohana-agent", mode=0o750)
+        _secure_mutable_path(paths["certificate"], group_name="ohana-agent", mode=0o644)
+        _secure_mutable_path(paths["private_key"], group_name="ohana-agent", mode=0o640)
+        _secure_mutable_path(paths["ca_certificate"], group_name="ohana-agent", mode=0o644)
+        _secure_root_secret(paths["ca_private_key"])
+        if paths["serial"].exists():
+            _secure_root_secret(paths["serial"])
+    return paths
+
+
+def _run_openssl(command: list[str]) -> None:
+    completed = subprocess.run(
+        command,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if completed.returncode != 0:
+        detail = (completed.stderr or completed.stdout).strip()
+        raise AdministrationPreparationError(
+            f"OpenSSL n'a pas pu préparer le certificat Katsuyu : {detail}"
+        )
+
+
+def _secure_root_secret(path: Path) -> None:
+    try:
+        shutil.chown(path, user="root", group="root")
+        path.chmod(0o600)
+    except (LookupError, OSError) as error:
+        raise AdministrationPreparationError(
+            f"Impossible de sécuriser la clé privée {path} : {error}"
+        ) from error
+
+
 def supports_network_administration(agent_version: str | None) -> bool:
     """Indiquer si la version Agent comprend le contrat NetworkManager du Lot C."""
     return _supports_agent_version(
@@ -389,6 +703,16 @@ def supports_dhcp_lease_purge(agent_version: str | None) -> bool:
     return _supports_agent_version(
         agent_version,
         minimum=DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION,
+    )
+
+
+def supports_distributed_jobs_tls(agent_version: str | None) -> bool:
+    """Provision jobs only for an Agent version that owns the HTTPS contract."""
+    if agent_version is None:
+        return False
+    return _supports_agent_version(
+        agent_version,
+        minimum=DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION,
     )
 
 
