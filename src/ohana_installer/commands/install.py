@@ -801,10 +801,7 @@ def run(args: argparse.Namespace) -> int:
                     )
 
             if migrate_backup_configuration():
-                print(
-                    "✓ /etc/ohana-agent/plugins/backup.yaml migré vers "
-                    "l'identité age gérée."
-                )
+                print("✓ /etc/ohana-agent/plugins/backup.yaml migré vers l'identité age gérée.")
 
             print()
             print("Préparation de l'administration graphique...")
@@ -821,6 +818,9 @@ def run(args: argparse.Namespace) -> int:
 
                 if administration.network_enabled:
                     print("✓ Administration NetworkManager sécurisée.")
+
+                if administration.companion_enabled:
+                    print("✓ Canal Shizune TLS préparé sans écraser la configuration locale.")
 
             if initial_network_configuration is not None:
                 if not administration.network_enabled:

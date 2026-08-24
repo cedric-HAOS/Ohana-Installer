@@ -6,6 +6,22 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.11.0] — Migration du canal Shizune — 2026-08-24
+
+## Ajouté
+
+- À partir d’Agent 1.24.0, l’installation et la mise à jour ajoutent le listener
+  compagnon HTTPS `8767` à `shikamaru.yaml` lorsqu’il est absent.
+- Le listener réutilise l’autorité et le certificat TLS déjà provisionnés pour
+  Katsuyu ; aucun nouveau système d’authentification n’est introduit.
+
+## Compatibilité
+
+- Les valeurs locales et une éventuelle section `administration.companion`
+  existante sont conservées sans modification.
+- APNs reste désactivé tant que les identifiants Apple et la clé `.p8` réels ne
+  sont pas configurés ; la migration est idempotente.
+
 # [1.10.0] — Provisionnement TLS Katsuyu — 2026-08-20
 
 ## Ajouté

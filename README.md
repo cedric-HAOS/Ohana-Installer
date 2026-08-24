@@ -494,3 +494,10 @@ l’add-on `teleinfo2mqtt Ohana`.
 Installer conserve toujours les configurations locales existantes. Une
 composition historique ne reçoit que les fichiers et arguments déclarés par
 son propre manifeste immuable.
+
+À partir d’Agent 1.24.0, `prepare_administration` complète également un
+`/etc/ohana-agent/shikamaru.yaml` existant avec le listener TLS Shizune s’il
+est absent. La migration est idempotente, réutilise les certificats Katsuyu et
+ne remplace aucune section `administration.companion` déjà configurée. Les
+identifiants APNs ne sont jamais inventés : l’envoi natif reste désactivé tant
+que la clé Apple et ses identifiants ne sont pas fournis explicitement.

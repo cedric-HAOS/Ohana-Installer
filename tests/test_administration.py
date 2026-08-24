@@ -421,6 +421,101 @@ def test_prepare_administration_enables_jobs_with_a_dedicated_tls_listener(
     assert parsed["administration"]["jobs"]["worker_tls"]["port"] == 8766
 
 
+def test_prepare_administration_adds_shizune_listener_without_replacing_local_values(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    agent_configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  host: 192.168.1.10
+  port: 9876
+  dhcp:
+    enabled: false
+""",
+        encoding="utf-8",
+    )
+    openssl = tmp_path / "openssl"
+    openssl.write_text("executable", encoding="utf-8")
+    tls_directory = agent_configuration.parent / "tls"
+
+    def fake_openssl(command: list[str]) -> None:
+        for option in ("-keyout", "-out"):
+            if option in command:
+                target = Path(command[command.index(option) + 1])
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"generated {target.name}", encoding="utf-8")
+
+    monkeypatch.setattr(administration_module, "_run_openssl", fake_openssl)
+    arguments = {
+        "agent_configuration_path": agent_configuration,
+        "agent_infrastructure_path": infrastructure,
+        "agent_token_path": agent_configuration.parent / "management.token",
+        "vision_configuration_path": vision_configuration,
+        "vision_token_path": vision_configuration.parent / "management.token",
+        "dnsmasq_executable": tmp_path / "missing-dnsmasq",
+        "dnsmasq_configuration_directory": tmp_path / "dnsmasq.d",
+        "systemd_directory": tmp_path / "systemd",
+        "require_linux": False,
+        "secure_ownership": False,
+        "agent_version": "1.24.0",
+        "worker_token_path": agent_configuration.parent / "katsuyu.token",
+        "worker_tls_directory": tls_directory,
+        "openssl_path": openssl,
+    }
+
+    first = prepare_administration(**arguments)
+    second = prepare_administration(**arguments)
+
+    content = agent_configuration.read_text(encoding="utf-8")
+    parsed = yaml.safe_load(content)
+    companion = parsed["administration"]["companion"]
+    assert first.companion_enabled is True
+    assert second.companion_enabled is True
+    assert content.count("  companion:") == 1
+    assert parsed["administration"]["host"] == "192.168.1.10"
+    assert parsed["administration"]["port"] == 9876
+    assert companion["host"] == "0.0.0.0"
+    assert companion["port"] == 8767
+    assert companion["certificate_file"] == (tls_directory / "worker.crt").as_posix()
+    assert companion["push"]["enabled"] is False
+
+
+def test_companion_migration_preserves_an_existing_section(tmp_path: Path) -> None:
+    configuration = tmp_path / "shikamaru.yaml"
+    configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  companion:
+    enabled: false
+    host: 10.0.0.10
+    port: 9443
+    credential_ttl_days: 12
+  dhcp:
+    enabled: true
+""",
+        encoding="utf-8",
+    )
+
+    administration_module._ensure_agent_companion_section(
+        configuration,
+        ca_certificate_path=Path("/etc/ohana-agent/tls/ca.crt"),
+        certificate_path=Path("/etc/ohana-agent/tls/worker.crt"),
+        private_key_path=Path("/etc/ohana-agent/tls/worker.key"),
+    )
+
+    parsed = yaml.safe_load(configuration.read_text(encoding="utf-8"))
+    assert parsed["administration"]["companion"] == {
+        "enabled": False,
+        "host": "10.0.0.10",
+        "port": 9443,
+        "credential_ttl_days": 12,
+    }
+
+
 def test_jobs_migration_preserves_existing_retention_and_replaces_only_tls(
     tmp_path: Path,
 ) -> None:

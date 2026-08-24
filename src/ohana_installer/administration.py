@@ -64,6 +64,7 @@ DHCP_RELOAD_HELPER_PATH = Path("/opt/ohana-agent/venv/bin/ohana-agent-dhcp-reloa
 NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
+SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION = (1, 24, 0)
 
 
 class AdministrationPreparationError(RuntimeError):
@@ -80,6 +81,7 @@ class AdministrationPreparation:
     network_enabled: bool = False
     jobs_enabled: bool = False
     worker_tls_enabled: bool = False
+    companion_enabled: bool = False
     units_installed: tuple[Path, ...] = ()
 
 
@@ -116,6 +118,7 @@ def prepare_administration(
             network_enabled=False,
             jobs_enabled=False,
             worker_tls_enabled=False,
+            companion_enabled=False,
         )
 
     required_paths = (
@@ -151,6 +154,7 @@ def prepare_administration(
     network_supported = supports_network_administration(agent_version)
     dhcp_lease_purge_supported = supports_dhcp_lease_purge(agent_version)
     jobs_tls_supported = supports_distributed_jobs_tls(agent_version)
+    companion_supported = supports_shizune_companion(agent_version)
 
     _append_section_if_missing(
         agent_configuration_path,
@@ -191,6 +195,13 @@ def prepare_administration(
             certificate_path=worker_tls_paths["certificate"],
             private_key_path=worker_tls_paths["private_key"],
         )
+        if companion_supported:
+            _ensure_agent_companion_section(
+                agent_configuration_path,
+                ca_certificate_path=worker_tls_paths["ca_certificate"],
+                certificate_path=worker_tls_paths["certificate"],
+                private_key_path=worker_tls_paths["private_key"],
+            )
 
     if secure_ownership:
         _secure_mutable_path(
@@ -254,6 +265,7 @@ def prepare_administration(
         network_enabled=network_preparation.enabled,
         jobs_enabled=jobs_tls_supported,
         worker_tls_enabled=jobs_tls_supported,
+        companion_enabled=companion_supported,
         units_installed=installed_units,
     )
 
@@ -533,6 +545,66 @@ def _ensure_agent_jobs_section(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
+def _ensure_agent_companion_section(
+    path: Path,
+    *,
+    ca_certificate_path: Path,
+    certificate_path: Path,
+    private_key_path: Path,
+) -> None:
+    """Add the bounded Shizune listener without overwriting local settings."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    administration_start = next(
+        (index for index, line in enumerate(lines) if line == "administration:"),
+        None,
+    )
+    if administration_start is None:
+        raise AdministrationPreparationError("La section administration Agent est absente.")
+    administration_end = _nested_section_end(
+        lines,
+        administration_start,
+        indentation=0,
+    )
+    companion_start = next(
+        (
+            index
+            for index in range(administration_start + 1, administration_end)
+            if lines[index] == "  companion:"
+        ),
+        None,
+    )
+    if companion_start is not None:
+        return
+    block = [
+        "  companion:",
+        "    enabled: true",
+        "    host: 0.0.0.0",
+        "    port: 8767",
+        f"    certificate_file: {certificate_path.as_posix()}",
+        f"    private_key_file: {private_key_path.as_posix()}",
+        f"    ca_certificate_file: {ca_certificate_path.as_posix()}",
+        "    credential_ttl_days: 90",
+        "    push:",
+        "      enabled: false",
+        "      environment: production",
+        "      team_id: null",
+        "      key_id: null",
+        "      bundle_id: fr.ohana.Shizune",
+        "      private_key_file: /etc/ohana-agent/shizune-apns.p8",
+        "      timeout_seconds: 5.0",
+    ]
+    insertion_index = next(
+        (
+            index
+            for index in range(administration_start + 1, administration_end)
+            if lines[index] in {"  network:", "  dhcp:"}
+        ),
+        administration_end,
+    )
+    lines[insertion_index:insertion_index] = block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
 def _nested_section_end(lines: list[str], start: int, *, indentation: int) -> int:
     for index in range(start + 1, len(lines)):
         line = lines[index]
@@ -713,6 +785,16 @@ def supports_distributed_jobs_tls(agent_version: str | None) -> bool:
     return _supports_agent_version(
         agent_version,
         minimum=DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION,
+    )
+
+
+def supports_shizune_companion(agent_version: str | None) -> bool:
+    """Provision the companion listener only when Agent owns its scoped contract."""
+    if agent_version is None:
+        return False
+    return _supports_agent_version(
+        agent_version,
+        minimum=SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION,
     )
 
 
