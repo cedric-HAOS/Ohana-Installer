@@ -14,15 +14,17 @@ Il automatise le déploiement d'une plateforme complète à partir des releases 
 
 # Écosystème
 
-Ohana est composé de cinq projets complémentaires :
+Ohana est composé de projets techniques complémentaires. Les noms fonctionnels
+Shikamaru, Tsunade et Konoha décrivent des rôles ou un domaine ; ils ne
+remplacent pas les packages et services installés.
 
 | Projet               | Rôle                                                            |
 | -------------------- | --------------------------------------------------------------- |
 | **Ohana-Platform**  | Architecture, documentation, contrats publics et Design System. |
-| **Ohana-Agent**     | Collecte les observations et surveille l'infrastructure.        |
-| **Ohana-Vision**    | Visualise les observations, l'état de santé et la topologie.    |
+| **Ohana-Agent**     | Runtime de Shikamaru et Tsunade, et frontière de sécurité.      |
+| **Ohana-Vision**    | Cockpit technique de l'infrastructure Konoha.                   |
 | **Ohana-Installer** | Installe, met à jour et désinstalle les composants officiels.   |
-| **Ohana-House**     | Documente le déploiement domestique de référence.               |
+| **Ohana-House**     | Documente le déploiement Konoha domestique de référence.        |
 
 Chaque projet possède une responsabilité clairement définie.
 
