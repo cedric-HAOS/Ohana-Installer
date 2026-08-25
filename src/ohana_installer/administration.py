@@ -214,6 +214,11 @@ def prepare_administration(
             mode=0o770,
         )
         _secure_mutable_path(
+            agent_configuration_path,
+            group_name="ohana-agent",
+            mode=0o660,
+        )
+        _secure_mutable_path(
             agent_infrastructure_path,
             group_name="ohana-agent",
             mode=0o660,
