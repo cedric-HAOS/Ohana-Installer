@@ -6,6 +6,22 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.11.1] — Migration Wake-on-LAN Katsuyu — 2026-08-25
+
+## Corrigé
+
+- À partir d’Agent 1.18.0, l’installation et la mise à jour ajoutent
+  `administration.jobs.wake_on_lan` à `shikamaru.yaml` lorsqu’elle est absente.
+- La migration reprend les valeurs de référence Agent et reste désactivée par
+  défaut tant qu’aucune adresse MAC Wake-on-LAN n’est configurée.
+
+## Compatibilité
+
+- Une section `wake_on_lan` déjà présente est conservée intégralement, y compris
+  ses valeurs locales ; la migration est idempotente.
+- Les Agents 1.17.x conservent uniquement le contrat jobs/TLS existant et ne
+  reçoivent pas de section Wake-on-LAN qu’ils ne connaissent pas.
+
 # [1.11.0] — Migration du canal Shizune — 2026-08-24
 
 ## Ajouté

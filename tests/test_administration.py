@@ -419,6 +419,97 @@ def test_prepare_administration_enables_jobs_with_a_dedicated_tls_listener(
     assert (tls_directory / "ca.crt").is_file()
     assert (tls_directory / "worker.crt").is_file()
     assert parsed["administration"]["jobs"]["worker_tls"]["port"] == 8766
+    assert "wake_on_lan" not in parsed["administration"]["jobs"]
+
+
+def test_prepare_administration_adds_wake_on_lan_for_agent_1_18_0(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    openssl = tmp_path / "openssl"
+    openssl.write_text("executable", encoding="utf-8")
+    tls_directory = agent_configuration.parent / "tls"
+
+    def fake_openssl(command: list[str]) -> None:
+        for option in ("-keyout", "-out"):
+            if option in command:
+                target = Path(command[command.index(option) + 1])
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(f"generated {target.name}", encoding="utf-8")
+
+    monkeypatch.setattr(administration_module, "_run_openssl", fake_openssl)
+    arguments = {
+        "agent_configuration_path": agent_configuration,
+        "agent_infrastructure_path": infrastructure,
+        "agent_token_path": agent_configuration.parent / "management.token",
+        "vision_configuration_path": vision_configuration,
+        "vision_token_path": vision_configuration.parent / "management.token",
+        "dnsmasq_executable": tmp_path / "missing-dnsmasq",
+        "dnsmasq_configuration_directory": tmp_path / "dnsmasq.d",
+        "systemd_directory": tmp_path / "systemd",
+        "require_linux": False,
+        "secure_ownership": False,
+        "agent_version": "1.18.0",
+        "worker_token_path": agent_configuration.parent / "katsuyu.token",
+        "worker_tls_directory": tls_directory,
+        "openssl_path": openssl,
+    }
+
+    prepare_administration(**arguments)
+    prepare_administration(**arguments)
+
+    content = agent_configuration.read_text(encoding="utf-8")
+    parsed = yaml.safe_load(content)
+    wake_on_lan = parsed["administration"]["jobs"]["wake_on_lan"]
+    assert content.count("    wake_on_lan:") == 1
+    assert wake_on_lan == {
+        "enabled": False,
+        "worker_id": "katsuyu-bubule",
+        "mac_address": None,
+        "broadcast_address": "192.168.1.255",
+        "port": 9,
+        "wait_timeout_seconds": 180,
+        "available_for_seconds": 30,
+    }
+
+
+def test_wake_on_lan_migration_preserves_an_existing_section(tmp_path: Path) -> None:
+    configuration = tmp_path / "shikamaru.yaml"
+    configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  jobs:
+    enabled: true
+    wake_on_lan:
+      enabled: true
+      worker_id: katsuyu-Bubule
+      mac_address: AA:BB:CC:DD:EE:FF
+      broadcast_address: 10.0.0.255
+      port: 7
+      wait_timeout_seconds: 240
+      available_for_seconds: 60
+    worker_tls:
+      enabled: true
+  dhcp:
+    enabled: true
+""",
+        encoding="utf-8",
+    )
+
+    administration_module._ensure_agent_wake_on_lan_section(configuration)
+
+    parsed = yaml.safe_load(configuration.read_text(encoding="utf-8"))
+    assert parsed["administration"]["jobs"]["wake_on_lan"] == {
+        "enabled": True,
+        "worker_id": "katsuyu-Bubule",
+        "mac_address": "AA:BB:CC:DD:EE:FF",
+        "broadcast_address": "10.0.0.255",
+        "port": 7,
+        "wait_timeout_seconds": 240,
+        "available_for_seconds": 60,
+    }
 
 
 def test_prepare_administration_adds_shizune_listener_without_replacing_local_values(

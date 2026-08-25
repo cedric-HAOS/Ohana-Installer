@@ -64,6 +64,7 @@ DHCP_RELOAD_HELPER_PATH = Path("/opt/ohana-agent/venv/bin/ohana-agent-dhcp-reloa
 NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
+WAKE_ON_LAN_MINIMUM_AGENT_VERSION = (1, 18, 0)
 SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION = (1, 24, 0)
 
 
@@ -154,6 +155,7 @@ def prepare_administration(
     network_supported = supports_network_administration(agent_version)
     dhcp_lease_purge_supported = supports_dhcp_lease_purge(agent_version)
     jobs_tls_supported = supports_distributed_jobs_tls(agent_version)
+    wake_on_lan_supported = supports_wake_on_lan(agent_version)
     companion_supported = supports_shizune_companion(agent_version)
 
     _append_section_if_missing(
@@ -195,6 +197,8 @@ def prepare_administration(
             certificate_path=worker_tls_paths["certificate"],
             private_key_path=worker_tls_paths["private_key"],
         )
+        if wake_on_lan_supported:
+            _ensure_agent_wake_on_lan_section(agent_configuration_path)
         if companion_supported:
             _ensure_agent_companion_section(
                 agent_configuration_path,
@@ -545,6 +549,58 @@ def _ensure_agent_jobs_section(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
+def _ensure_agent_wake_on_lan_section(path: Path) -> None:
+    """Add the bounded Wake-on-LAN policy without overwriting local settings."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    administration_start = next(
+        (index for index, line in enumerate(lines) if line == "administration:"),
+        None,
+    )
+    if administration_start is None:
+        raise AdministrationPreparationError("La section administration Agent est absente.")
+    administration_end = _nested_section_end(
+        lines,
+        administration_start,
+        indentation=0,
+    )
+    jobs_start = next(
+        (
+            index
+            for index in range(administration_start + 1, administration_end)
+            if lines[index] == "  jobs:"
+        ),
+        None,
+    )
+    if jobs_start is None:
+        raise AdministrationPreparationError("La section jobs Agent est absente.")
+
+    jobs_end = _nested_section_end(lines, jobs_start, indentation=2)
+    wake_start = next(
+        (index for index in range(jobs_start + 1, jobs_end) if lines[index] == "    wake_on_lan:"),
+        None,
+    )
+    if wake_start is not None:
+        return
+
+    worker_tls_start = next(
+        (index for index in range(jobs_start + 1, jobs_end) if lines[index] == "    worker_tls:"),
+        None,
+    )
+    insertion_index = worker_tls_start if worker_tls_start is not None else jobs_end
+    block = [
+        "    wake_on_lan:",
+        "      enabled: false",
+        "      worker_id: katsuyu-bubule",
+        "      mac_address: null",
+        "      broadcast_address: 192.168.1.255",
+        "      port: 9",
+        "      wait_timeout_seconds: 180",
+        "      available_for_seconds: 30",
+    ]
+    lines[insertion_index:insertion_index] = block
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
 def _ensure_agent_companion_section(
     path: Path,
     *,
@@ -785,6 +841,16 @@ def supports_distributed_jobs_tls(agent_version: str | None) -> bool:
     return _supports_agent_version(
         agent_version,
         minimum=DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION,
+    )
+
+
+def supports_wake_on_lan(agent_version: str | None) -> bool:
+    """Provision Wake-on-LAN only when Agent owns the Phase 5 contract."""
+    if agent_version is None:
+        return False
+    return _supports_agent_version(
+        agent_version,
+        minimum=WAKE_ON_LAN_MINIMUM_AGENT_VERSION,
     )
 
 

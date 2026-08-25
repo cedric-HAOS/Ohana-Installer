@@ -206,6 +206,7 @@ def run(args: argparse.Namespace) -> int:
                     rclone_config=rclone_config,
                     remote=args.remote,
                 )
+
                 def manifest_reader(backup_id: str) -> bytes:
                     return rclone_read_bytes(
                         f"{args.remote.rstrip('/')}/{backup_id}/manifest.json",

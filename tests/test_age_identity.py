@@ -58,12 +58,8 @@ def test_ensure_local_identity_creates_public_files_and_uploads_recovery(
     recipient = age_identity.ensure_local_identity(command_runner=runner)
 
     assert recipient == "age1managedrecipient"
-    assert age_identity.IDENTITY_PATH.read_text(encoding="utf-8") == (
-        "AGE-SECRET-KEY-1TEST\n"
-    )
-    assert age_identity.RECIPIENT_PATH.read_text(encoding="utf-8") == (
-        "age1managedrecipient\n"
-    )
+    assert age_identity.IDENTITY_PATH.read_text(encoding="utf-8") == ("AGE-SECRET-KEY-1TEST\n")
+    assert age_identity.RECIPIENT_PATH.read_text(encoding="utf-8") == ("age1managedrecipient\n")
     assert any("copyto" in command for command in commands)
     assert any(age_identity.RECOVERY_REMOTE_PATH in command for command in commands)
 
