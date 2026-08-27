@@ -424,7 +424,7 @@ def test_repository_manifest_is_valid() -> None:
     manifest = load_manifest(manifest_path)
 
     assert manifest.platform_name == "Ohana"
-    assert manifest.platform_version == "1.0.82"
+    assert manifest.platform_version == "1.0.84"
     assert manifest.runtime.minimum_python_version == "3.13"
     assert {component.identifier for component in manifest.components} == {
         "agent",
@@ -497,9 +497,9 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/zwave.yaml",
     )
 
-    assert vision.version == "1.22.3"
-    assert vision.release_tag == "v1.22.3"
-    assert vision.package.filename == ("ohana_vision-1.22.3-py3-none-any.whl")
+    assert vision.version == "1.22.5"
+    assert vision.release_tag == "v1.22.5"
+    assert vision.package.filename == ("ohana_vision-1.22.5-py3-none-any.whl")
     assert vision.configuration is not None
     assert vision.service is not None
     assert vision.service.user == "ohana-vision"
@@ -511,9 +511,9 @@ def test_repository_manifest_is_valid() -> None:
     shizune = next(
         component for component in manifest.components if component.identifier == "shizune"
     )
-    assert shizune.version == "0.1.0"
+    assert shizune.version == "0.2.0"
     assert shizune.package.type == "static"
-    assert shizune.package.filename == "shizune-pwa-0.1.0.tar.gz"
+    assert shizune.package.filename == "shizune-pwa-0.2.0.tar.gz"
     assert shizune.static is not None
     assert shizune.static.directory == Path("/var/www/shizune")
 

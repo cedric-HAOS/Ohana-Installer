@@ -6,7 +6,7 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
-# [Unreleased] — Intégration de Shizune PWA
+# [1.14.0] — Intégration de Shizune PWA — 2026-08-27
 
 ## Ajouté
 
@@ -14,6 +14,9 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 - téléchargement et extraction sûre de l’archive Shizune ;
 - validation de `version.json` et installation dans `/var/www/shizune` ;
 - désinstallation du répertoire statique Shizune avec les autres composants.
+- copie publique et dédiée de la CA compagnon vers
+  `/etc/ohana-vision/companion-ca.crt` ;
+- activation idempotente de la passerelle Shizune dans la configuration Vision.
 
 ## Sécurité
 

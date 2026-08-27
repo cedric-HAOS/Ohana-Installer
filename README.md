@@ -296,6 +296,8 @@ L'installateur détecte les versions présentes :
 * les services sont redémarrés et vérifiés après cette réconciliation ;
 * la PWA Shizune est installée comme site statique dans `/var/www/shizune`,
   sans service systemd propre ;
+* la CA publique du listener compagnon est copiée pour Vision dans
+  `/etc/ohana-vision/companion-ca.crt`, sans exposer la clé privée Agent ;
 * si une version cible est plus ancienne, la rétrogradation est refusée par défaut ;
 * une rétrogradation explicitement sélectionnée exige `--allow-downgrade` ;
 * le plan de mise à jour est affiché et doit être confirmé.

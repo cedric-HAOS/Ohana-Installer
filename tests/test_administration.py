@@ -450,6 +450,7 @@ def test_prepare_administration_adds_wake_on_lan_for_agent_1_18_0(
         "agent_token_path": agent_configuration.parent / "management.token",
         "vision_configuration_path": vision_configuration,
         "vision_token_path": vision_configuration.parent / "management.token",
+        "vision_companion_ca_path": vision_configuration.parent / "companion-ca.crt",
         "dnsmasq_executable": tmp_path / "missing-dnsmasq",
         "dnsmasq_configuration_directory": tmp_path / "dnsmasq.d",
         "systemd_directory": tmp_path / "systemd",
@@ -567,6 +568,7 @@ administration:
         "require_linux": False,
         "secure_ownership": False,
         "agent_version": "1.24.0",
+        "vision_companion_ca_path": vision_configuration.parent / "companion-ca.crt",
         "worker_token_path": agent_configuration.parent / "katsuyu.token",
         "worker_tls_directory": tls_directory,
         "openssl_path": openssl,
@@ -587,6 +589,15 @@ administration:
     assert companion["port"] == 8767
     assert companion["certificate_file"] == (tls_directory / "worker.crt").as_posix()
     assert companion["push"]["enabled"] is False
+    vision = yaml.safe_load(vision_configuration.read_text(encoding="utf-8"))
+    assert vision["agent"]["companion_enabled"] is True
+    assert vision["agent"]["companion_url"] == "https://infra-01.ohana.lan:8767"
+    assert vision["agent"]["companion_ca_file"] == (
+        vision_configuration.parent / "companion-ca.crt"
+    ).as_posix()
+    assert (vision_configuration.parent / "companion-ca.crt").read_text(
+        encoding="utf-8"
+    ) == (tls_directory / "ca.crt").read_text(encoding="utf-8")
 
 
 def test_companion_migration_preserves_an_existing_section(tmp_path: Path) -> None:

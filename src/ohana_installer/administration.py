@@ -45,6 +45,7 @@ AGENT_PLUGIN_CONFIGURATION_FILENAMES = (
 VISION_CONFIGURATION_DIRECTORY = Path("/etc/ohana-vision")
 VISION_CONFIGURATION_PATH = VISION_CONFIGURATION_DIRECTORY / "vision.yaml"
 VISION_TOKEN_PATH = VISION_CONFIGURATION_DIRECTORY / "management.token"
+VISION_COMPANION_CA_PATH = VISION_CONFIGURATION_DIRECTORY / "companion-ca.crt"
 
 DNSMASQ_EXECUTABLE = Path("/usr/sbin/dnsmasq")
 DNSMASQ_CONFIGURATION_DIRECTORY = Path("/etc/dnsmasq.d")
@@ -94,6 +95,7 @@ def prepare_administration(
     agent_token_path: Path = AGENT_TOKEN_PATH,
     vision_configuration_path: Path = VISION_CONFIGURATION_PATH,
     vision_token_path: Path = VISION_TOKEN_PATH,
+    vision_companion_ca_path: Path = VISION_COMPANION_CA_PATH,
     dnsmasq_executable: Path = DNSMASQ_EXECUTABLE,
     dnsmasq_configuration_directory: Path = (DNSMASQ_CONFIGURATION_DIRECTORY),
     systemd_directory: Path = SYSTEMD_SYSTEM_DIRECTORY,
@@ -210,6 +212,16 @@ def prepare_administration(
                 ca_certificate_path=worker_tls_paths["ca_certificate"],
                 certificate_path=worker_tls_paths["certificate"],
                 private_key_path=worker_tls_paths["private_key"],
+            )
+            _install_vision_companion_ca(
+                worker_tls_paths["ca_certificate"],
+                vision_companion_ca_path,
+                secure_ownership=secure_ownership,
+            )
+            _ensure_vision_companion_section(
+                vision_configuration_path,
+                companion_url=f"https://{worker_dns_name}:8767",
+                ca_certificate_path=vision_companion_ca_path,
             )
 
     if secure_ownership:
@@ -719,6 +731,55 @@ def _ensure_agent_companion_section(
     )
     lines[insertion_index:insertion_index] = block
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
+def _install_vision_companion_ca(
+    source: Path,
+    destination: Path,
+    *,
+    secure_ownership: bool,
+) -> None:
+    """Give Vision a public CA copy without exposing Agent's TLS directory."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        shutil.copyfile(source, destination)
+    except OSError as error:
+        raise AdministrationPreparationError(
+            f"Impossible de fournir la CA compagnon à Vision : {error}"
+        ) from error
+    if secure_ownership:
+        _secure_mutable_path(destination, group_name="ohana-vision", mode=0o644)
+
+
+def _ensure_vision_companion_section(
+    path: Path,
+    *,
+    companion_url: str,
+    ca_certificate_path: Path,
+) -> None:
+    """Complete Vision's existing Agent section for the Shizune bridge."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    agent_start = next(
+        (index for index, line in enumerate(lines) if line == "agent:"),
+        None,
+    )
+    if agent_start is None:
+        raise AdministrationPreparationError("La section agent de Vision est absente.")
+    agent_end = _nested_section_end(lines, agent_start, indentation=0)
+    existing = {
+        line.strip().split(":", 1)[0]
+        for line in lines[agent_start + 1 : agent_end]
+        if line.startswith("  ") and not line.startswith("    ") and ":" in line
+    }
+    values = (
+        ("companion_enabled", "true"),
+        ("companion_url", companion_url),
+        ("companion_ca_file", ca_certificate_path.as_posix()),
+    )
+    additions = [f"  {name}: {value}" for name, value in values if name not in existing]
+    if additions:
+        lines[agent_end:agent_end] = additions
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
 def _nested_section_end(lines: list[str], start: int, *, indentation: int) -> int:

@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.82"
+  version: "1.0.84"
 
 runtime:
   python:
@@ -114,12 +114,12 @@ components:
   vision:
     name: Ohana-Vision
     repository: cedric-HAOS/Ohana-Vision
-    version: "1.22.3"
-    release_tag: v1.22.3
+    version: "1.22.5"
+    release_tag: v1.22.5
 
     package:
       type: wheel
-      filename: ohana_vision-1.22.3-py3-none-any.whl
+      filename: ohana_vision-1.22.5-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-vision
@@ -141,12 +141,12 @@ components:
   shizune:
     name: Ohana-Shizune
     repository: cedric-HAOS/Ohana-Shizune
-    version: "0.1.0"
-    release_tag: v0.1.0
+    version: "0.2.0"
+    release_tag: v0.2.0
 
     package:
       type: static
-      filename: shizune-pwa-0.1.0.tar.gz
+      filename: shizune-pwa-0.2.0.tar.gz
 
     static:
       directory: /var/www/shizune
