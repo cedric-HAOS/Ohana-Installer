@@ -399,7 +399,7 @@ def test_repository_manifest_is_valid() -> None:
     manifest = load_manifest(manifest_path)
 
     assert manifest.platform_name == "Ohana"
-    assert manifest.platform_version == "1.0.23"
+    assert manifest.platform_version == "1.0.80"
     assert manifest.runtime.minimum_python_version == "3.13"
     assert {component.identifier for component in manifest.components} == {
         "agent",
@@ -420,9 +420,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.11.1"
-    assert agent.release_tag == "v1.11.1"
-    assert agent.package.filename == ("ohana_agent-1.11.1-py3-none-any.whl")
+    assert agent.version == "1.26.4"
+    assert agent.release_tag == "v1.26.4"
+    assert agent.package.filename == ("ohana_agent-1.26.4-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
@@ -438,6 +438,7 @@ def test_repository_manifest_is_valid() -> None:
         ("mqtt.example.yaml", "plugins/mqtt.yaml"),
         ("network.example.yaml", "plugins/network.yaml"),
         ("dhcp.example.yaml", "plugins/dhcp.yaml"),
+        ("backup.example.yaml", "plugins/backup.yaml"),
         ("wireguard.example.yaml", "plugins/wireguard.yaml"),
         ("home-assistant-telemetry.example.yaml", "plugins/home-assistant-telemetry.yaml"),
         ("teleinformation.example.yaml", "plugins/teleinformation.yaml"),
@@ -458,6 +459,8 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/network.yaml",
         "--dhcp-config",
         "/etc/ohana-agent/plugins/dhcp.yaml",
+        "--backup-config",
+        "/etc/ohana-agent/plugins/backup.yaml",
         "--home-assistant-telemetry-config",
         "/etc/ohana-agent/plugins/home-assistant-telemetry.yaml",
         "--teleinformation-config",
@@ -468,9 +471,9 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/zwave.yaml",
     )
 
-    assert vision.version == "1.10.0"
-    assert vision.release_tag == "v1.10.0"
-    assert vision.package.filename == ("ohana_vision-1.10.0-py3-none-any.whl")
+    assert vision.version == "1.22.2"
+    assert vision.release_tag == "v1.22.2"
+    assert vision.package.filename == ("ohana_vision-1.22.2-py3-none-any.whl")
     assert vision.configuration is not None
     assert vision.service is not None
     assert vision.service.user == "ohana-vision"

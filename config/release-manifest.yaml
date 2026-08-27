@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.23"
+  version: "1.0.80"
 
 runtime:
   python:
@@ -32,12 +32,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.11.1"
-    release_tag: v1.11.1
+    version: "1.26.4"
+    release_tag: v1.26.4
 
     package:
       type: wheel
-      filename: ohana_agent-1.11.1-py3-none-any.whl
+      filename: ohana_agent-1.26.4-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent
@@ -62,6 +62,9 @@ components:
 
         - source: dhcp.example.yaml
           destination: plugins/dhcp.yaml
+
+        - source: backup.example.yaml
+          destination: plugins/backup.yaml
 
         - source: wireguard.example.yaml
           destination: plugins/wireguard.yaml
@@ -97,6 +100,8 @@ components:
         - /etc/ohana-agent/plugins/network.yaml
         - --dhcp-config
         - /etc/ohana-agent/plugins/dhcp.yaml
+        - --backup-config
+        - /etc/ohana-agent/plugins/backup.yaml
         - --home-assistant-telemetry-config
         - /etc/ohana-agent/plugins/home-assistant-telemetry.yaml
         - --teleinformation-config
@@ -109,12 +114,12 @@ components:
   vision:
     name: Ohana-Vision
     repository: cedric-HAOS/Ohana-Vision
-    version: "1.10.0"
-    release_tag: v1.10.0
+    version: "1.22.2"
+    release_tag: v1.22.2
 
     package:
       type: wheel
-      filename: ohana_vision-1.10.0-py3-none-any.whl
+      filename: ohana_vision-1.22.2-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-vision

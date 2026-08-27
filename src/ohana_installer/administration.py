@@ -65,6 +65,7 @@ NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
 WAKE_ON_LAN_MINIMUM_AGENT_VERSION = (1, 18, 0)
+WAKE_ON_LAN_BATCHING_MINIMUM_AGENT_VERSION = (1, 26, 4)
 SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION = (1, 24, 0)
 
 
@@ -156,6 +157,7 @@ def prepare_administration(
     dhcp_lease_purge_supported = supports_dhcp_lease_purge(agent_version)
     jobs_tls_supported = supports_distributed_jobs_tls(agent_version)
     wake_on_lan_supported = supports_wake_on_lan(agent_version)
+    wake_on_lan_batching_supported = supports_wake_on_lan_batching(agent_version)
     companion_supported = supports_shizune_companion(agent_version)
 
     _append_section_if_missing(
@@ -198,7 +200,10 @@ def prepare_administration(
             private_key_path=worker_tls_paths["private_key"],
         )
         if wake_on_lan_supported:
-            _ensure_agent_wake_on_lan_section(agent_configuration_path)
+            _ensure_agent_wake_on_lan_section(
+                agent_configuration_path,
+                include_batching=wake_on_lan_batching_supported,
+            )
         if companion_supported:
             _ensure_agent_companion_section(
                 agent_configuration_path,
@@ -554,7 +559,11 @@ def _ensure_agent_jobs_section(
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
 
 
-def _ensure_agent_wake_on_lan_section(path: Path) -> None:
+def _ensure_agent_wake_on_lan_section(
+    path: Path,
+    *,
+    include_batching: bool = True,
+) -> None:
     """Add the bounded Wake-on-LAN policy without overwriting local settings."""
     lines = path.read_text(encoding="utf-8").splitlines()
     administration_start = next(
@@ -585,6 +594,10 @@ def _ensure_agent_wake_on_lan_section(path: Path) -> None:
         None,
     )
     if wake_start is not None:
+        if include_batching:
+            wake_end = _nested_section_end(lines, wake_start, indentation=4)
+            _add_missing_wake_on_lan_options(lines, wake_start, wake_end)
+            path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
         return
 
     worker_tls_start = next(
@@ -602,8 +615,50 @@ def _ensure_agent_wake_on_lan_section(path: Path) -> None:
         "      wait_timeout_seconds: 180",
         "      available_for_seconds: 30",
     ]
+    if include_batching:
+        block.extend(
+            [
+                "      packet_burst_count: 3",
+                "      burst_interval_seconds: 0.1",
+                "      retry_count: 2",
+                "      retry_delay_seconds: 1.0",
+                "      batch_window_seconds: 600",
+                "      planned_window_start_hour: 0",
+                "      planned_window_end_hour: 5",
+                "      schedule_timezone: Europe/Paris",
+                "      minimum_interval_seconds: 7200",
+                "      shutdown_after_completion: true",
+            ]
+        )
     lines[insertion_index:insertion_index] = block
     path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
+def _add_missing_wake_on_lan_options(
+    lines: list[str],
+    wake_start: int,
+    wake_end: int,
+) -> None:
+    defaults = (
+        ("packet_burst_count", "3"),
+        ("burst_interval_seconds", "0.1"),
+        ("retry_count", "2"),
+        ("retry_delay_seconds", "1.0"),
+        ("batch_window_seconds", "600"),
+        ("planned_window_start_hour", "0"),
+        ("planned_window_end_hour", "5"),
+        ("schedule_timezone", "Europe/Paris"),
+        ("minimum_interval_seconds", "7200"),
+        ("shutdown_after_completion", "true"),
+    )
+    existing = {
+        line.strip().split(":", 1)[0]
+        for line in lines[wake_start + 1 : wake_end]
+        if line.startswith("      ") and ":" in line
+    }
+    additions = [f"      {name}: {value}" for name, value in defaults if name not in existing]
+    if additions:
+        lines[wake_end:wake_end] = additions
 
 
 def _ensure_agent_companion_section(
@@ -856,6 +911,16 @@ def supports_wake_on_lan(agent_version: str | None) -> bool:
     return _supports_agent_version(
         agent_version,
         minimum=WAKE_ON_LAN_MINIMUM_AGENT_VERSION,
+    )
+
+
+def supports_wake_on_lan_batching(agent_version: str | None) -> bool:
+    """Indiquer si Agent comprend les rafales et le regroupement WOL."""
+    if agent_version is None:
+        return False
+    return _supports_agent_version(
+        agent_version,
+        minimum=WAKE_ON_LAN_BATCHING_MINIMUM_AGENT_VERSION,
     )
 
 

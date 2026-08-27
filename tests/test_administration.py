@@ -422,6 +422,11 @@ def test_prepare_administration_enables_jobs_with_a_dedicated_tls_listener(
     assert "wake_on_lan" not in parsed["administration"]["jobs"]
 
 
+def test_wake_on_lan_batching_requires_agent_1_26_4() -> None:
+    assert administration_module.supports_wake_on_lan_batching("1.26.3") is False
+    assert administration_module.supports_wake_on_lan_batching("1.26.4") is True
+
+
 def test_prepare_administration_adds_wake_on_lan_for_agent_1_18_0(
     tmp_path: Path,
     monkeypatch,
@@ -509,6 +514,16 @@ administration:
         "port": 7,
         "wait_timeout_seconds": 240,
         "available_for_seconds": 60,
+        "packet_burst_count": 3,
+        "burst_interval_seconds": 0.1,
+        "retry_count": 2,
+        "retry_delay_seconds": 1.0,
+        "batch_window_seconds": 600,
+        "planned_window_start_hour": 0,
+        "planned_window_end_hour": 5,
+        "schedule_timezone": "Europe/Paris",
+        "minimum_interval_seconds": 7200,
+        "shutdown_after_completion": True,
     }
 
 
