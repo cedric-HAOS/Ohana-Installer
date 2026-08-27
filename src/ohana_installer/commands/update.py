@@ -38,6 +38,7 @@ from ohana_installer.commands.install import (
     _generate_services,
     _install_agent,
     _install_configurations,
+    _install_shizune,
     _install_vision,
     _load_official_manifest,
     _load_selected_manifest,
@@ -76,6 +77,11 @@ from ohana_installer.release_selection import (
     release_selection_arguments,
     selection_from_args,
 )
+from ohana_installer.static_site import (
+    InstalledStaticComponent,
+    StaticSiteInstallationError,
+    inspect_static_component,
+)
 from ohana_installer.system_account import SystemAccountError
 from ohana_installer.system_capabilities import (
     CapabilityProvisioningError,
@@ -109,6 +115,7 @@ COMPONENT_RUNTIMES = {
         VISION_COMMAND_NAME,
     ),
 }
+InstalledComponent = InstalledPythonComponent | InstalledStaticComponent
 
 
 def configure_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -171,15 +178,21 @@ def _replace_services(
 
 def _inspect_installed_components(
     manifest: PlatformManifest,
-) -> dict[str, InstalledPythonComponent | None]:
+) -> dict[str, InstalledComponent | None]:
     """Détecter les versions actuellement installées."""
 
     installed_components: dict[
         str,
-        InstalledPythonComponent | None,
+        InstalledComponent | None,
     ] = {}
 
     for component in manifest.components:
+        if component.package.type == "static":
+            try:
+                installed_components[component.identifier] = inspect_static_component(component)
+            except StaticSiteInstallationError as error:
+                raise PackageInstallationError(str(error)) from error
+            continue
         try:
             environment_path, command_name = COMPONENT_RUNTIMES[component.identifier]
         except KeyError as error:
@@ -200,7 +213,7 @@ def _display_update_plan(
     manifest: PlatformManifest,
     installed_components: dict[
         str,
-        InstalledPythonComponent | None,
+        InstalledComponent | None,
     ],
 ) -> None:
     """Afficher les versions installées et les versions cibles."""
@@ -223,7 +236,7 @@ def _versions_are_current(
     manifest: PlatformManifest,
     installed_components: dict[
         str,
-        InstalledPythonComponent | None,
+        InstalledComponent | None,
     ],
 ) -> bool:
     return all(
@@ -237,7 +250,7 @@ def _components_requiring_update(
     manifest: PlatformManifest,
     installed_components: dict[
         str,
-        InstalledPythonComponent | None,
+        InstalledComponent | None,
     ],
 ) -> tuple[ComponentManifest, ...]:
     """Sélectionner uniquement les composants absents ou obsolètes."""
@@ -691,6 +704,21 @@ def run(args: argparse.Namespace) -> int:
                 )
 
                 print(f"✓ {installed_vision.name} {installed_vision.version} mis à jour.")
+
+            if "shizune" in updated_identifiers:
+                print()
+                print("Mise à jour de Shizune...")
+                try:
+                    installed_shizune = _install_shizune(
+                        downloaded_components,
+                        replace=True,
+                    )
+                except PackageInstallationError:
+                    raise
+                print(
+                    f"✓ {installed_shizune.name} {installed_shizune.version} "
+                    f"mis à jour dans {installed_shizune.installation_path}."
+                )
 
             print()
             print("Préparation de l'administration graphique...")

@@ -55,6 +55,11 @@ from ohana_installer.release_selection import (
     download_selected_manifest,
     selection_from_args,
 )
+from ohana_installer.static_site import (
+    InstalledStaticComponent,
+    StaticSiteInstallationError,
+    install_static_component,
+)
 from ohana_installer.system_account import (
     SystemAccount,
     SystemAccountError,
@@ -92,6 +97,8 @@ VISION_IDENTIFIER = "vision"
 VISION_INSTALLATION_PATH = Path("/opt/ohana-vision")
 VISION_ENVIRONMENT_PATH = VISION_INSTALLATION_PATH / "venv"
 VISION_COMMAND_NAME = "ohana-vision"
+SHIZUNE_IDENTIFIER = "shizune"
+SHIZUNE_INSTALLATION_PATH = Path("/var/www/shizune")
 
 INSTALLATION_OWNER = "root"
 CONFIGURATION_OWNER = "root"
@@ -641,6 +648,27 @@ def _install_vision(
     )
 
 
+def _install_shizune(
+    downloaded_components: tuple[DownloadedComponent, ...],
+    *,
+    replace: bool = False,
+) -> InstalledStaticComponent:
+    """Installer la PWA Shizune dans son répertoire statique."""
+
+    downloaded_component = _find_downloaded_component(
+        downloaded_components,
+        SHIZUNE_IDENTIFIER,
+    )
+    try:
+        return install_static_component(
+            downloaded_component.component,
+            downloaded_component.path,
+            replace=replace,
+        )
+    except StaticSiteInstallationError as error:
+        raise PackageInstallationError(str(error)) from error
+
+
 def run(args: argparse.Namespace) -> int:
     """Exécuter la commande install."""
 
@@ -774,6 +802,19 @@ def run(args: argparse.Namespace) -> int:
             )
 
             print(f"✓ {installed_vision.name} {installed_vision.version} installé.")
+            shizune_components = tuple(
+                component
+                for component in manifest.components
+                if component.identifier == SHIZUNE_IDENTIFIER
+            )
+            if shizune_components:
+                print()
+                print("Installation de Shizune...")
+                installed_shizune = _install_shizune(downloaded_components)
+                print(
+                    f"✓ {installed_shizune.name} {installed_shizune.version} installé "
+                    f"dans {installed_shizune.installation_path}."
+                )
             print()
             print("Installation des fichiers de configuration...")
 

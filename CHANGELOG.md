@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [Unreleased] — Intégration de Shizune PWA
+
+## Ajouté
+
+- support des composants web statiques déclarés par le manifeste Platform ;
+- téléchargement et extraction sûre de l’archive Shizune ;
+- validation de `version.json` et installation dans `/var/www/shizune` ;
+- désinstallation du répertoire statique Shizune avec les autres composants.
+
+## Sécurité
+
+- refus des chemins absolus, traversals et liens dans les archives PWA ;
+- aucune réponse API privée n’est mise en cache par Installer.
+
 # [1.11.1] — Migration Wake-on-LAN Katsuyu — 2026-08-25
 
 ## Corrigé

@@ -285,7 +285,7 @@ relance ensuite automatiquement avec la nouvelle version.
 Une fois l'Installer à jour, la commande utilise la composition recommandée par
 Ohana-Platform, ou la composition explicitement sélectionnée avec les mêmes options
 que `install`. Le manifeste de la release Platform choisie détermine les releases
-exactes d'Ohana-Agent et d'Ohana-Vision.
+exactes d'Ohana-Agent, d'Ohana-Vision et, lorsqu'il est présent, d'Ohana-Shizune.
 
 L'installateur détecte les versions présentes :
 
@@ -294,6 +294,8 @@ L'installateur détecte les versions présentes :
 * les configurations manquantes et les unités systemd sont toujours
   réconciliées avec la composition Platform ;
 * les services sont redémarrés et vérifiés après cette réconciliation ;
+* la PWA Shizune est installée comme site statique dans `/var/www/shizune`,
+  sans service systemd propre ;
 * si une version cible est plus ancienne, la rétrogradation est refusée par défaut ;
 * une rétrogradation explicitement sélectionnée exige `--allow-downgrade` ;
 * le plan de mise à jour est affiché et doit être confirmé.
@@ -309,6 +311,8 @@ ohana uninstall
 ```
 
 supprime proprement les composants installés ainsi que les services associés.
+Le répertoire statique `/var/www/shizune` est supprimé avec les autres
+composants après confirmation.
 
 Les services et répertoires concernés sont affichés avant une confirmation
 négative par défaut.

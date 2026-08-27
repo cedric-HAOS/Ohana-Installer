@@ -9,6 +9,7 @@ import pytest
 from ohana_installer.cli import main
 from ohana_installer.commands.install import (
     AGENT_INSTALLATION_PATH,
+    SHIZUNE_INSTALLATION_PATH,
     VISION_INSTALLATION_PATH,
 )
 from ohana_installer.systemd import (
@@ -64,6 +65,7 @@ def test_uninstall_removes_services_and_components(
         "network-admin",
         f"path:{AGENT_INSTALLATION_PATH}",
         f"path:{VISION_INSTALLATION_PATH}",
+        f"path:{SHIZUNE_INSTALLATION_PATH}",
     ]
 
     output = capsys.readouterr().out
@@ -72,7 +74,8 @@ def test_uninstall_removes_services_and_components(
     assert "ohana-vision.service désactivé" in output
     assert f"{AGENT_INSTALLATION_PATH} supprimé" in output
     assert f"{VISION_INSTALLATION_PATH} supprimé" in output
-    assert ("Ohana-Agent et Ohana-Vision sont désinstallés.") in output
+    assert f"{SHIZUNE_INSTALLATION_PATH} supprimé" in output
+    assert ("Ohana-Agent, Ohana-Vision et Shizune sont désinstallés.") in output
     assert ("Les fichiers de configuration ont été conservés.") in output
 
 

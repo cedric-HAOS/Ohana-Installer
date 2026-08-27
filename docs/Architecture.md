@@ -228,8 +228,12 @@ Dans sa première version, Ohana-Installer gère les composants suivants :
 
 * Ohana-Agent
 * Ohana-Vision
+* Ohana-Shizune, installé comme archive web statique dans `/var/www/shizune`
 
-Chaque composant est installé indépendamment.
+Chaque composant est installé indépendamment. Un composant statique doit
+déclarer une archive `.tar.gz`, `.tgz` ou `.zip`, une destination absolue et un
+`version.json` contenant son nom et sa version. Installer refuse les chemins
+d'extraction dangereux et vérifie la version avant tout remplacement.
 
 Cette architecture permettra d'ajouter de nouveaux composants officiels sans remettre en cause le fonctionnement général de l'installateur.
 

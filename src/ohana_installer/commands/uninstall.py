@@ -26,6 +26,7 @@ from ohana_installer.commands.automatic_update import (
 )
 from ohana_installer.commands.install import (
     AGENT_INSTALLATION_PATH,
+    SHIZUNE_INSTALLATION_PATH,
     VISION_INSTALLATION_PATH,
 )
 from ohana_installer.confirmation import confirm_action
@@ -56,6 +57,7 @@ SERVICE_NAMES = (
 INSTALLATION_PATHS = (
     AGENT_INSTALLATION_PATH,
     VISION_INSTALLATION_PATH,
+    SHIZUNE_INSTALLATION_PATH,
 )
 
 
@@ -232,7 +234,7 @@ def run(args: argparse.Namespace) -> int:
         return UNINSTALLATION_ERROR
 
     print()
-    print("Ohana-Agent et Ohana-Vision sont désinstallés.")
+    print("Ohana-Agent, Ohana-Vision et Shizune sont désinstallés.")
     print("Les fichiers de configuration ont été conservés.")
 
     return 0

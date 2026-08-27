@@ -51,8 +51,15 @@ class ComponentConfiguration:
 
 
 @dataclass(frozen=True)
+class StaticInstallation:
+    """Destination d'un composant web statique."""
+
+    directory: Path
+
+
+@dataclass(frozen=True)
 class ComponentPackage:
-    """Package Python distribué pour un composant Ohana."""
+    """Package distribué pour un composant Ohana."""
 
     type: str
     filename: str
@@ -69,6 +76,7 @@ class ComponentManifest:
     release_tag: str
     package: ComponentPackage
     configuration: ComponentConfiguration | None = None
+    static: StaticInstallation | None = None
     service: ComponentService | None = None
 
 
@@ -326,8 +334,8 @@ def _parse_component(
         f"{component_path}.package",
     )
 
-    if package_type != "wheel":
-        raise ManifestError(f"{component_path}.package.type doit être égal à 'wheel'.")
+    if package_type not in {"wheel", "static"}:
+        raise ManifestError(f"{component_path}.package.type doit être égal à 'wheel' ou 'static'.")
 
     package = ComponentPackage(
         type=package_type,
@@ -338,8 +346,12 @@ def _parse_component(
         ),
     )
 
-    if not package.filename.endswith(".whl"):
+    if package_type == "wheel" and not package.filename.endswith(".whl"):
         raise ManifestError(f"{component_path}.package.filename doit désigner un fichier .whl.")
+    if package_type == "static" and not package.filename.endswith((".tar.gz", ".tgz", ".zip")):
+        raise ManifestError(
+            f"{component_path}.package.filename doit désigner une archive statique."
+        )
 
     if Path(package.filename).name != package.filename:
         raise ManifestError(
@@ -368,6 +380,22 @@ def _parse_component(
         else None
     )
 
+    raw_static = component.get("static")
+    static = None
+    if raw_static is not None:
+        static_data = _require_mapping(raw_static, f"{component_path}.static")
+        static_directory = _require_non_empty_string(
+            static_data,
+            "directory",
+            f"{component_path}.static",
+        )
+        if not PurePosixPath(static_directory).is_absolute():
+            raise ManifestError(f"{component_path}.static.directory doit être un chemin absolu.")
+        static = StaticInstallation(directory=Path(static_directory))
+
+    if package_type == "static" and static is None:
+        raise ManifestError(f"{component_path}.static est obligatoire pour un package statique.")
+
     raw_service = component.get("service")
 
     service = (
@@ -378,6 +406,11 @@ def _parse_component(
         if raw_service is not None
         else None
     )
+
+    if package_type == "static" and service is not None:
+        raise ManifestError(
+            f"{component_path} ne peut pas déclarer un service avec un package statique."
+        )
 
     version = _require_non_empty_string(
         component,
@@ -407,6 +440,7 @@ def _parse_component(
         release_tag=release_tag,
         package=package,
         configuration=configuration,
+        static=static,
         service=service,
     )
 
@@ -654,13 +688,14 @@ CATALOG_RELEASE_STATUSES = frozenset({"recommended", "supported", "legacy"})
 
 @dataclass(frozen=True)
 class PlatformReleaseEntry:
-    """Couple Agent/Vision publié par une release Ohana-Platform."""
+    """Composition publiée par une release Ohana-Platform."""
 
     platform_version: str
     release_tag: str
     agent_version: str
     vision_version: str
     status: str
+    shizune_version: str | None = None
 
 
 @dataclass(frozen=True)
@@ -839,6 +874,14 @@ def validate_manifest_catalog_entry(
             f"Agent {entry.agent_version} / Vision {entry.vision_version}."
         )
 
+    shizune = components.get("shizune")
+    if shizune is not None and shizune.version != entry.shizune_version:
+        raise ManifestError(
+            "Le manifeste sélectionné ne correspond pas à la version Shizune "
+            f"déclarée dans le catalogue : {shizune.version}, attendu "
+            f"{entry.shizune_version}."
+        )
+
 
 def _parse_release_catalog_entry(
     raw_release: Any,
@@ -865,6 +908,11 @@ def _parse_release_catalog_entry(
         agent_version=_require_semantic_version(release, "agent_version", path),
         vision_version=_require_semantic_version(release, "vision_version", path),
         status=status,
+        shizune_version=(
+            _require_semantic_version(release, "shizune_version", path)
+            if release.get("shizune_version") is not None
+            else None
+        ),
     )
 
 
