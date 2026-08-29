@@ -2,17 +2,24 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.84"
+  version: "1.0.91"
 
-default_platform_version: "1.0.84"
+default_platform_version: "1.0.91"
 
 releases:
+  - platform_version: "1.0.91"
+    release_tag: v1.0.91
+    agent_version: "1.26.12"
+    vision_version: "1.22.10"
+    shizune_version: "0.2.2"
+    status: recommended
+
   - platform_version: "1.0.84"
     release_tag: v1.0.84
     agent_version: "1.26.5"
     vision_version: "1.22.5"
     shizune_version: "0.2.0"
-    status: recommended
+    status: supported
 
   - platform_version: "1.0.83"
     release_tag: v1.0.83

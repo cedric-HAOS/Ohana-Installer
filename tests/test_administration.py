@@ -427,6 +427,50 @@ def test_wake_on_lan_batching_requires_agent_1_26_4() -> None:
     assert administration_module.supports_wake_on_lan_batching("1.26.4") is True
 
 
+def test_infra_log_source_requires_agent_1_26_12() -> None:
+    assert administration_module.supports_infra_log_source("1.26.11") is False
+    assert administration_module.supports_infra_log_source("1.26.12") is True
+
+
+def test_infra_log_source_migration_is_additive_and_idempotent(tmp_path: Path) -> None:
+    configuration = tmp_path / "shikamaru.yaml"
+    configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  jobs:
+    enabled: true
+    logs:
+      enabled: true
+      schedule: "15 4 * * *"
+      sources:
+        - linky-01
+      window_hours: 12
+      max_bytes_per_source: 1048576
+      timeout_seconds: 600
+    worker_tls:
+      enabled: true
+""",
+        encoding="utf-8",
+    )
+
+    administration_module._ensure_agent_infra_log_source(configuration)
+    administration_module._ensure_agent_infra_log_source(configuration)
+
+    content = configuration.read_text(encoding="utf-8")
+    parsed = yaml.safe_load(content)
+    logs = parsed["administration"]["jobs"]["logs"]
+    assert content.count("        - infra-01") == 1
+    assert logs == {
+        "enabled": True,
+        "schedule": "15 4 * * *",
+        "sources": ["infra-01", "linky-01"],
+        "window_hours": 12,
+        "max_bytes_per_source": 1048576,
+        "timeout_seconds": 600,
+    }
+
+
 def test_prepare_administration_adds_wake_on_lan_for_agent_1_18_0(
     tmp_path: Path,
     monkeypatch,
@@ -592,12 +636,13 @@ administration:
     vision = yaml.safe_load(vision_configuration.read_text(encoding="utf-8"))
     assert vision["agent"]["companion_enabled"] is True
     assert vision["agent"]["companion_url"] == "https://infra-01.ohana.lan:8767"
-    assert vision["agent"]["companion_ca_file"] == (
-        vision_configuration.parent / "companion-ca.crt"
-    ).as_posix()
-    assert (vision_configuration.parent / "companion-ca.crt").read_text(
-        encoding="utf-8"
-    ) == (tls_directory / "ca.crt").read_text(encoding="utf-8")
+    assert (
+        vision["agent"]["companion_ca_file"]
+        == (vision_configuration.parent / "companion-ca.crt").as_posix()
+    )
+    assert (vision_configuration.parent / "companion-ca.crt").read_text(encoding="utf-8") == (
+        tls_directory / "ca.crt"
+    ).read_text(encoding="utf-8")
 
 
 def test_companion_migration_preserves_an_existing_section(tmp_path: Path) -> None:

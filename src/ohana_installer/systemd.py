@@ -169,7 +169,7 @@ def render_systemd_service(
     if service.filename == "ohana-agent.service":
         service_lines.extend(
             [
-                "SupplementaryGroups=ohana-vision",
+                "SupplementaryGroups=ohana-vision systemd-journal",
                 "RuntimeDirectory=ohana-agent",
                 "RuntimeDirectoryMode=0750",
             ]

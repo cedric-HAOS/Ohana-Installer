@@ -67,6 +67,7 @@ DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
 WAKE_ON_LAN_MINIMUM_AGENT_VERSION = (1, 18, 0)
 WAKE_ON_LAN_BATCHING_MINIMUM_AGENT_VERSION = (1, 26, 4)
+INFRA_LOG_SOURCE_MINIMUM_AGENT_VERSION = (1, 26, 12)
 SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION = (1, 24, 0)
 
 
@@ -160,6 +161,7 @@ def prepare_administration(
     jobs_tls_supported = supports_distributed_jobs_tls(agent_version)
     wake_on_lan_supported = supports_wake_on_lan(agent_version)
     wake_on_lan_batching_supported = supports_wake_on_lan_batching(agent_version)
+    infra_log_source_supported = supports_infra_log_source(agent_version)
     companion_supported = supports_shizune_companion(agent_version)
 
     _append_section_if_missing(
@@ -206,6 +208,8 @@ def prepare_administration(
                 agent_configuration_path,
                 include_batching=wake_on_lan_batching_supported,
             )
+        if infra_log_source_supported:
+            _ensure_agent_infra_log_source(agent_configuration_path)
         if companion_supported:
             _ensure_agent_companion_section(
                 agent_configuration_path,
@@ -673,6 +677,70 @@ def _add_missing_wake_on_lan_options(
         lines[wake_end:wake_end] = additions
 
 
+def _ensure_agent_infra_log_source(path: Path) -> None:
+    """Add INFRA-01 to the bounded log policy without replacing local values."""
+    lines = path.read_text(encoding="utf-8").splitlines()
+    jobs_start = next(
+        (index for index, line in enumerate(lines) if line == "  jobs:"),
+        None,
+    )
+    if jobs_start is None:
+        raise AdministrationPreparationError("La section jobs Agent est absente.")
+    jobs_end = _nested_section_end(lines, jobs_start, indentation=2)
+    logs_start = next(
+        (index for index in range(jobs_start + 1, jobs_end) if lines[index] == "    logs:"),
+        None,
+    )
+    if logs_start is None:
+        insertion_index = next(
+            (
+                index
+                for index in range(jobs_start + 1, jobs_end)
+                if lines[index] in {"    wake_on_lan:", "    worker_tls:"}
+            ),
+            jobs_end,
+        )
+        lines[insertion_index:insertion_index] = [
+            "    logs:",
+            "      enabled: false",
+            '      schedule: "0 5 * * *"',
+            "      sources:",
+            "        - infra-01",
+            "        - ha-01",
+            "        - linky-01",
+            "        - zwave-01",
+            "      window_hours: 24",
+            "      max_bytes_per_source: 2097152",
+            "      timeout_seconds: 900",
+        ]
+    else:
+        logs_end = _nested_section_end(lines, logs_start, indentation=4)
+        sources_start = next(
+            (
+                index
+                for index in range(logs_start + 1, logs_end)
+                if lines[index] == "      sources:"
+            ),
+            None,
+        )
+        if sources_start is None:
+            lines[logs_end:logs_end] = [
+                "      sources:",
+                "        - infra-01",
+            ]
+        else:
+            sources_end = _nested_section_end(lines, sources_start, indentation=6)
+            configured = {
+                line.removeprefix("        - ").strip()
+                for line in lines[sources_start + 1 : sources_end]
+                if line.startswith("        - ")
+            }
+            if "infra-01" in configured:
+                return
+            lines.insert(sources_start + 1, "        - infra-01")
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+
+
 def _ensure_agent_companion_section(
     path: Path,
     *,
@@ -982,6 +1050,16 @@ def supports_wake_on_lan_batching(agent_version: str | None) -> bool:
     return _supports_agent_version(
         agent_version,
         minimum=WAKE_ON_LAN_BATCHING_MINIMUM_AGENT_VERSION,
+    )
+
+
+def supports_infra_log_source(agent_version: str | None) -> bool:
+    """Provision INFRA-01 journal analysis only for compatible Agents."""
+    if agent_version is None:
+        return False
+    return _supports_agent_version(
+        agent_version,
+        minimum=INFRA_LOG_SOURCE_MINIMUM_AGENT_VERSION,
     )
 
 

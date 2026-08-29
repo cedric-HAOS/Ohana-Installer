@@ -6,6 +6,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.14.1] — Journaux propres de Tsunade — 2026-08-29
+
+## Ajouté
+
+- Pour Agent 1.26.12 et suivants, la migration ajoute `infra-01` aux sources
+  existantes de contrôle des journaux sans modifier leurs autres valeurs.
+- L’unité `ohana-agent.service` rejoint le groupe `systemd-journal` afin de lire
+  uniquement les journaux bornés par le contrat Agent.
+
+## Compatibilité
+
+- La migration est additive et idempotente ; les versions Agent antérieures ne
+  reçoivent pas une source qu’elles ne comprennent pas.
+
 # [1.14.0] — Intégration de Shizune PWA — 2026-08-27
 
 ## Ajouté

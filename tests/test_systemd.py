@@ -509,7 +509,7 @@ def test_render_systemd_service() -> None:
         "--mqtt-config /etc/ohana-agent/plugins/mqtt.yaml"
     ) in content
     assert "Restart=on-failure" in content
-    assert "SupplementaryGroups=ohana-vision" in content
+    assert "SupplementaryGroups=ohana-vision systemd-journal" in content
     assert "RuntimeDirectory=ohana-agent" in content
     assert "RuntimeDirectoryMode=0750" in content
     assert "StateDirectory=ohana-agent" in content
