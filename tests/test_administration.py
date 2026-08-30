@@ -471,6 +471,65 @@ administration:
     }
 
 
+def test_infra_log_source_migration_repairs_misaligned_existing_sources(
+    tmp_path: Path,
+) -> None:
+    configuration = tmp_path / "shikamaru.yaml"
+    configuration.write_text(
+        """version: 1
+administration:
+  enabled: true
+  jobs:
+    enabled: true
+    logs:
+      enabled: true
+      schedule: "0 5 * * *"
+      sources:
+      - ha-01
+      - linky-01
+      - zwave-01
+      window_hours: 24
+    worker_tls:
+      enabled: true
+""",
+        encoding="utf-8",
+    )
+
+    administration_module._ensure_agent_infra_log_source(configuration)
+    administration_module._ensure_agent_infra_log_source(configuration)
+
+    content = configuration.read_text(encoding="utf-8")
+    parsed = yaml.safe_load(content)
+    assert content.count("        - infra-01") == 1
+    assert parsed["administration"]["jobs"]["logs"]["sources"] == [
+        "infra-01",
+        "ha-01",
+        "linky-01",
+        "zwave-01",
+    ]
+
+
+def test_infra_log_source_migration_does_not_write_invalid_yaml(tmp_path: Path) -> None:
+    configuration = tmp_path / "shikamaru.yaml"
+    original = """version: 1
+administration:
+  jobs:
+    logs:
+      sources:
+        - linky-01
+  invalid: [
+"""
+    configuration.write_text(original, encoding="utf-8")
+
+    with pytest.raises(
+        administration_module.AdministrationPreparationError,
+        match="YAML invalide",
+    ):
+        administration_module._ensure_agent_infra_log_source(configuration)
+
+    assert configuration.read_text(encoding="utf-8") == original
+
+
 def test_prepare_administration_adds_wake_on_lan_for_agent_1_18_0(
     tmp_path: Path,
     monkeypatch,

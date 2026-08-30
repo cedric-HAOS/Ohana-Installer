@@ -6,6 +6,22 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.14.2] — Migration de journaux sûre — 2026-08-30
+
+## Corrigé
+
+- La migration des sources de journaux répare les éléments de liste historiques
+  alignés avec `sources:` avant d’ajouter `infra-01`, sans supprimer ni remplacer
+  les sources locales.
+- Le YAML migré est validé en mémoire avant toute écriture ; en cas d’erreur, le
+  fichier `shikamaru.yaml` existant reste intact et Agent peut continuer à
+  démarrer avec sa configuration précédente.
+
+## Compatibilité
+
+- La migration reste additive et idempotente pour les configurations déjà
+  valides d’Agent 1.26.12 et suivants.
+
 # [1.14.1] — Journaux propres de Tsunade — 2026-08-29
 
 ## Ajouté

@@ -9,6 +9,8 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
+import yaml
+
 from ohana_installer.network import (
     AGENT_NETWORK_HELPER_ENTRYPOINT,
     NETWORK_HELPER_PATH,
@@ -729,16 +731,40 @@ def _ensure_agent_infra_log_source(path: Path) -> None:
                 "        - infra-01",
             ]
         else:
+            # Installer releases predating this migration could leave list items
+            # aligned with ``sources:``. Repair only those direct list items so
+            # local source names are preserved before adding INFRA-01.
+            source_index = sources_start + 1
+            while source_index < len(lines):
+                line = lines[source_index]
+                if line.startswith("      - "):
+                    lines[source_index] = f"  {line}"
+                    source_index += 1
+                    continue
+                if not line.strip() or line.lstrip().startswith("#"):
+                    source_index += 1
+                    continue
+                if len(line) - len(line.lstrip()) > 6:
+                    source_index += 1
+                    continue
+                break
             sources_end = _nested_section_end(lines, sources_start, indentation=6)
             configured = {
                 line.removeprefix("        - ").strip()
                 for line in lines[sources_start + 1 : sources_end]
                 if line.startswith("        - ")
             }
-            if "infra-01" in configured:
-                return
-            lines.insert(sources_start + 1, "        - infra-01")
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8", newline="\n")
+            if "infra-01" not in configured:
+                lines.insert(sources_start + 1, "        - infra-01")
+
+    rendered = "\n".join(lines) + "\n"
+    try:
+        yaml.safe_load(rendered)
+    except yaml.YAMLError as error:
+        raise AdministrationPreparationError(
+            "La migration de la configuration Agent produirait un YAML invalide."
+        ) from error
+    path.write_text(rendered, encoding="utf-8", newline="\n")
 
 
 def _ensure_agent_companion_section(

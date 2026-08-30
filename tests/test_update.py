@@ -217,7 +217,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    release = _installer_release("1.14.2")
+    release = _installer_release("1.14.3")
     operations: list[str] = []
 
     monkeypatch.setattr(
@@ -253,7 +253,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
         "verify_component_command",
         lambda **kwargs: InstalledPythonComponent(
             name="Ohana-Installer",
-            version="1.14.1",
+            version="1.14.3",
             environment_path=Path(sys.prefix),
             executable_path=Path(sys.prefix) / "bin" / "ohana",
         ),
@@ -266,12 +266,12 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
 
     assert result == "updated"
     assert operations == [
-        "download:ohana_installer-1.14.2-py3-none-any.whl",
-        (f"upgrade:ohana_installer-1.14.2-py3-none-any.whl:{sys.executable}"),
+        "download:ohana_installer-1.14.3-py3-none-any.whl",
+        (f"upgrade:ohana_installer-1.14.3-py3-none-any.whl:{sys.executable}"),
     ]
     output = capsys.readouterr().out
-    assert "1.14.2 téléchargé et vérifié" in output
-    assert "1.14.1 mis à jour" in output
+    assert "1.14.3 téléchargé et vérifié" in output
+    assert "1.14.3 mis à jour" in output
 
 
 def test_installer_self_update_can_be_declined(
@@ -281,7 +281,7 @@ def test_installer_self_update_can_be_declined(
     monkeypatch.setattr(
         update_command,
         "discover_latest_release",
-        lambda repository: _installer_release("1.14.2"),
+        lambda repository: _installer_release("1.14.3"),
     )
     monkeypatch.setattr(
         update_command,
@@ -311,7 +311,7 @@ def test_installer_self_update_requires_one_wheel(
         update_command,
         "discover_latest_release",
         lambda repository: _installer_release(
-            "1.14.2",
+            "1.14.3",
             include_wheel=False,
         ),
     )
