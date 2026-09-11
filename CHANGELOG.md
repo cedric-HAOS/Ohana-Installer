@@ -6,6 +6,13 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+# [1.14.3] — Composition Tsunade/Shizune — 2026-09-11
+
+- Manifeste et catalogue alignés sur Platform 1.0.97 : Agent 1.26.16,
+  Vision 1.22.13 et Shizune 0.2.3. L’historique du catalogue est conservé.
+- Aucun changement de configuration locale requis. Katsuyu 0.8.6 se met à jour
+  séparément sur son hôte, après Agent, pour activer l’arrêt en fin de cycle.
+
 # [1.14.2] — Migration de journaux sûre — 2026-08-30
 
 ## Corrigé
