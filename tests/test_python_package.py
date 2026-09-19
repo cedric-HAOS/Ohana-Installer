@@ -35,7 +35,7 @@ def test_create_virtual_environment_runs_python_venv(
 
         received_command = command
 
-        assert timeout == 120.0
+        assert timeout == 300.0
         assert "Impossible de créer" in error_message
 
         environment_path.mkdir()
@@ -147,7 +147,7 @@ def test_upgrade_wheel_uses_current_python_and_upgrade(
     ) -> subprocess.CompletedProcess[str]:
         nonlocal received_command
         received_command = command
-        assert timeout == 120.0
+        assert timeout == 300.0
         assert "mettre à niveau" in error_message
         return subprocess.CompletedProcess(command, 0, "", "")
 

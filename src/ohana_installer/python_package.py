@@ -10,7 +10,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-DEFAULT_COMMAND_TIMEOUT = 120.0
+DEFAULT_COMMAND_TIMEOUT = 300.0
 
 INSTALLATION_DIRECTORY_MODE = 0o750
 INSTALLATION_FILE_MODE = 0o640
