@@ -11,6 +11,7 @@ from ipaddress import IPv4Address, IPv4Interface
 from pathlib import Path
 
 from ohana_installer.administration import (
+    AdministrationPreparation,
     AdministrationPreparationError,
     activate_administration,
     prepare_administration,
@@ -669,10 +670,46 @@ def _install_shizune(
         raise PackageInstallationError(str(error)) from error
 
 
+_INSTALLATION_FAILURES: tuple[tuple[tuple[type[Exception], ...], str], ...] = (
+    ((SystemdCommandError,), "Commande systemd impossible"),
+    ((SystemdInstallationError,), "Installation systemd impossible"),
+    ((SystemdGenerationError,), "Génération systemd impossible"),
+    ((DownloadError,), "Téléchargement impossible"),
+    ((ManifestError,), "Le manifeste officiel est invalide"),
+    (
+        (
+            CapabilityProvisioningError,
+            AgeIdentityError,
+            ConfigurationMigrationError,
+            PackageInstallationError,
+            RcloneInstallationError,
+        ),
+        "Installation impossible",
+    ),
+    ((ConfigurationInstallationError,), "Installation des configurations impossible"),
+    ((AdministrationPreparationError,), "Préparation de l'administration impossible"),
+    ((NetworkProvisioningError,), "Configuration réseau impossible"),
+    ((SystemAccountError,), "Préparation des comptes système impossible"),
+)
+
+
+def failure_message(
+    error: Exception,
+    failures: tuple[tuple[tuple[type[Exception], ...], str], ...],
+) -> str:
+    """Return the first matching label, exactly like ordered except clauses."""
+    label = next(label for types, label in failures if isinstance(error, types))
+    return f"✗ {label} : {error}"
+
+
+def failure_types(
+    failures: tuple[tuple[tuple[type[Exception], ...], str], ...],
+) -> tuple[type[Exception], ...]:
+    return tuple(error_type for types, _ in failures for error_type in types)
+
+
 def run(args: argparse.Namespace) -> int:
     """Exécuter la commande install."""
-
-    assume_yes = bool(args.yes)
 
     try:
         release_selection = selection_from_args(args)
@@ -684,22 +721,12 @@ def run(args: argparse.Namespace) -> int:
         print(f"✗ Configuration réseau invalide : {error}")
         return INSTALLATION_ERROR
 
-    print("Vérification de l'environnement...")
-    print()
-
-    checks = run_environment_checks()
-
-    for check in checks:
-        _display_check(check)
-
-    print()
-
-    if not all(check.success for check in checks):
-        print("L'environnement ne permet pas de poursuivre l'installation.")
+    if not display_environment(
+        run_environment_checks(),
+        "L'environnement ne permet pas de poursuivre l'installation.",
+    ):
         return INSTALLATION_ERROR
 
-    print("L'environnement est compatible avec Ohana-Installer.")
-    print()
     print("Téléchargement du catalogue et du manifeste officiels...")
 
     try:
@@ -707,301 +734,351 @@ def run(args: argparse.Namespace) -> int:
             prefix="ohana-installer-",
         ) as temporary_directory:
             temporary_path = Path(temporary_directory)
-
-            if release_selection is None:
-                manifest = _load_official_manifest(temporary_path)
-            else:
-                manifest = _load_selected_manifest(
-                    temporary_path,
-                    release_selection,
-                )
-
-            print("✓ Catalogue et manifeste téléchargés et validés.")
-            print()
-
-            _display_manifest(manifest)
-
-            agent_version = _component_version(manifest, AGENT_IDENTIFIER)
-            if initial_network_configuration is not None and not supports_network_administration(
-                agent_version
-            ):
-                raise NetworkProvisioningError(
-                    "Le provisionnement réseau depuis Installer nécessite "
-                    "Ohana-Agent 1.11.0 ou une version ultérieure."
-                )
+            manifest = _prepare_installation_manifest(
+                temporary_path,
+                release_selection,
+                initial_network_configuration,
+            )
 
             print()
 
             if not confirm_action(
                 "Installer cette release de la plateforme Ohana ?",
-                assume_yes=assume_yes,
+                assume_yes=bool(args.yes),
             ):
                 print("Installation annulée.")
                 return 0
 
             print()
-            if manifest.profile is not None:
-                print(f"Provisionnement du profil {manifest.profile.name}...")
-                provisioning = provision_profile(manifest.profile)
-                _display_profile_provisioning(provisioning)
-                print()
-
-            print("Téléchargement des composants...")
-
-            downloaded_components = _download_components(
+            if not _install_platform(
                 manifest,
                 temporary_path,
-            )
-
-            for downloaded_component in downloaded_components:
-                component = downloaded_component.component
-                print(f"✓ {component.name} {component.version} téléchargé.")
-
-            print()
-            print("Téléchargement des configurations...")
-
-            downloaded_configurations = _download_configurations(
-                manifest,
-                temporary_path,
-            )
-
-            for downloaded_configuration in downloaded_configurations:
-                print(
-                    "✓ "
-                    f"{downloaded_configuration.configuration_file.source} "
-                    "téléchargé pour "
-                    f"{downloaded_configuration.component.name}."
-                )
-
-            print()
-            print("Préparation des comptes système...")
-
-            system_accounts = _ensure_service_accounts(manifest)
-
-            for system_account in system_accounts:
-                group_status = "créé" if system_account.group_created else "déjà présent"
-                user_status = "créé" if system_account.user_created else "déjà présent"
-
-                print(f"✓ Groupe système {system_account.group_name} {group_status}.")
-                print(f"✓ Compte système {system_account.username} {user_status}.")
-
-            print()
-            print("Installation d'Ohana-Agent...")
-
-            rclone_version = ensure_rclone()
-            print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
-
-            installed_agent = _install_agent(downloaded_components)
-
-            print(f"✓ {installed_agent.name} {installed_agent.version} installé.")
-            print()
-            print("Installation d'Ohana-Vision...")
-
-            installed_vision = _install_vision(
-                downloaded_components,
-            )
-
-            print(f"✓ {installed_vision.name} {installed_vision.version} installé.")
-            shizune_components = tuple(
-                component
-                for component in manifest.components
-                if component.identifier == SHIZUNE_IDENTIFIER
-            )
-            if shizune_components:
-                print()
-                print("Installation de Shizune...")
-                installed_shizune = _install_shizune(downloaded_components)
-                print(
-                    f"✓ {installed_shizune.name} {installed_shizune.version} installé "
-                    f"dans {installed_shizune.installation_path}."
-                )
-            print()
-            print("Installation des fichiers de configuration...")
-
-            installed_configurations = _install_configurations(
-                downloaded_configurations,
-            )
-
-            for installed_configuration in installed_configurations:
-                destination = installed_configuration.destination_path
-
-                if installed_configuration.created:
-                    print(
-                        f"✓ {destination} installé "
-                        f"({CONFIGURATION_OWNER}:"
-                        f"{installed_configuration.group_name}, "
-                        f"{CONFIGURATION_FILE_MODE:04o})."
-                    )
-                else:
-                    print(
-                        f"✓ {destination} conservé "
-                        "(configuration locale existante, "
-                        f"{CONFIGURATION_OWNER}:"
-                        f"{installed_configuration.group_name}, "
-                        f"{CONFIGURATION_FILE_MODE:04o})."
-                    )
-
-            if migrate_backup_configuration():
-                print("✓ /etc/ohana-agent/plugins/backup.yaml migré vers l'identité age gérée.")
-
-            print()
-            print("Préparation de l'administration graphique...")
-
-            administration = prepare_administration(agent_version=agent_version)
-
-            if administration.configured:
-                print("✓ Canal Agent/Vision sécurisé et configuré.")
-
-                if administration.dhcp_enabled:
-                    print("✓ Administration DHCP dnsmasq préparée.")
-                else:
-                    print("✓ DHCP absent : administration DHCP désactivée.")
-
-                if administration.network_enabled:
-                    print("✓ Administration NetworkManager sécurisée.")
-
-                if administration.companion_enabled:
-                    print("✓ Canal Shizune TLS préparé sans écraser la configuration locale.")
-
-            if initial_network_configuration is not None:
-                if not administration.network_enabled:
-                    raise NetworkProvisioningError(
-                        "NetworkManager n'est pas disponible sur cette machine."
-                    )
-                print()
-                print("Application de la configuration réseau initiale...")
-                network_state = apply_initial_network_configuration(initial_network_configuration)
-                interface = network_state.get(
-                    "interface",
-                    initial_network_configuration.interface,
-                )
-                method = network_state.get(
-                    "method",
-                    initial_network_configuration.method,
-                )
-                print(f"✓ Interface {interface} configurée en {method}.")
-
-            print()
-            print("Génération des services systemd...")
-
-            generated_services = _generate_services(
-                manifest,
-                temporary_path,
-            )
-
-            for generated_service in generated_services:
-                print(
-                    f"✓ {generated_service.path.name} généré "
-                    f"pour {generated_service.component.name}."
-                )
-
-            print()
-            print("Installation des services systemd...")
-
-            installed_services = _install_services(
-                generated_services,
-            )
-
-            for installed_service in installed_services:
-                if installed_service.created:
-                    print(f"✓ {installed_service.destination_path} installé.")
-                else:
-                    print(f"✓ {installed_service.destination_path} conservé (déjà identique).")
-            print()
-            print("Rechargement de systemd...")
-
-            _reload_systemd()
-
-            print("✓ Configuration systemd rechargée.")
-            activate_administration(administration)
-
-            if administration.dhcp_enabled:
-                print("✓ Surveillance du rechargement DHCP activée.")
-
-            print()
-            print("Activation des services systemd...")
-
-            _enable_services(installed_services)
-
-            for installed_service in installed_services:
-                print(f"✓ {installed_service.destination_path.name} activé.")
-            print()
-            print("Démarrage des services systemd...")
-
-            _start_services(installed_services)
-
-            for installed_service in installed_services:
-                print(f"✓ {installed_service.destination_path.name} démarré.")
-            print()
-            print("Vérification des services systemd...")
-
-            statuses = _check_services(installed_services)
-
-            for status in statuses:
-                if status.active:
-                    print(f"✓ {status.service_name} est actif.")
-                else:
-                    print(f"✗ {status.service_name} est {status.status}.")
-                    return INSTALLATION_ERROR
-
-            if not args.defer_age_identity:
-                print()
-                print("Préparation de l'identité de sauvegarde INFRA-01...")
-                recipient = ensure_local_identity()
-                print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
-
-    except SystemdCommandError as error:
-        print(f"✗ Commande systemd impossible : {error}")
-        return INSTALLATION_ERROR
-    except SystemdInstallationError as error:
-        print(f"✗ Installation systemd impossible : {error}")
-        return INSTALLATION_ERROR
-    except SystemdGenerationError as error:
-        print(f"✗ Génération systemd impossible : {error}")
-        return INSTALLATION_ERROR
-    except DownloadError as error:
-        print(f"✗ Téléchargement impossible : {error}")
-        return INSTALLATION_ERROR
-    except ManifestError as error:
-        print(f"✗ Le manifeste officiel est invalide : {error}")
-        return INSTALLATION_ERROR
-    except (
-        CapabilityProvisioningError,
-        AgeIdentityError,
-        ConfigurationMigrationError,
-        PackageInstallationError,
-        RcloneInstallationError,
-    ) as error:
-        print(f"✗ Installation impossible : {error}")
-        return INSTALLATION_ERROR
-    except ConfigurationInstallationError as error:
-        print(f"✗ Installation des configurations impossible : {error}")
-        return INSTALLATION_ERROR
-    except AdministrationPreparationError as error:
-        print(f"✗ Préparation de l'administration impossible : {error}")
-        return INSTALLATION_ERROR
-    except NetworkProvisioningError as error:
-        print(f"✗ Configuration réseau impossible : {error}")
-        return INSTALLATION_ERROR
-    except SystemAccountError as error:
-        print(f"✗ Préparation des comptes système impossible : {error}")
+                initial_network_configuration,
+                defer_age_identity=bool(args.defer_age_identity),
+            ):
+                return INSTALLATION_ERROR
+    except failure_types(_INSTALLATION_FAILURES) as error:
+        print(failure_message(error, _INSTALLATION_FAILURES))
         return INSTALLATION_ERROR
 
     print()
     print("Ohana-Agent et Ohana-Vision sont installés, configurés, activés et démarrés.")
-    if manifest.profile is not None:
-        explicit = tuple(
-            capability
-            for capability in manifest.profile.capabilities
-            if capability.activation == "explicit"
-        )
-        for capability in explicit:
-            print(
-                f"La capacité {capability.name} n'est pas activée automatiquement. "
-                f"Activez-la avec : ohana capability activate {capability.identifier}"
-            )
-
+    _display_explicit_capabilities(manifest)
     return 0
+
+
+def display_environment(
+    checks: tuple[EnvironmentCheck, ...] | list[EnvironmentCheck],
+    failure: str,
+) -> bool:
+    """Display every environment check and whether the command may continue."""
+    print("Vérification de l'environnement...")
+    print()
+
+    for check in checks:
+        _display_check(check)
+
+    print()
+
+    if not all(check.success for check in checks):
+        print(failure)
+        return False
+
+    print("L'environnement est compatible avec Ohana-Installer.")
+    print()
+    return True
+
+
+def _prepare_installation_manifest(
+    temporary_path: Path,
+    release_selection: ReleaseSelection | None,
+    network_configuration: InitialNetworkConfiguration | None,
+) -> PlatformManifest:
+    if release_selection is None:
+        manifest = _load_official_manifest(temporary_path)
+    else:
+        manifest = _load_selected_manifest(temporary_path, release_selection)
+
+    print("✓ Catalogue et manifeste téléchargés et validés.")
+    print()
+
+    _display_manifest(manifest)
+
+    agent_version = _component_version(manifest, AGENT_IDENTIFIER)
+    if network_configuration is not None and not supports_network_administration(agent_version):
+        raise NetworkProvisioningError(
+            "Le provisionnement réseau depuis Installer nécessite "
+            "Ohana-Agent 1.11.0 ou une version ultérieure."
+        )
+
+    return manifest
+
+
+def _install_platform(
+    manifest: PlatformManifest,
+    temporary_path: Path,
+    network_configuration: InitialNetworkConfiguration | None,
+    *,
+    defer_age_identity: bool,
+) -> bool:
+    """Install every component, then return whether all services are active."""
+    if manifest.profile is not None:
+        print(f"Provisionnement du profil {manifest.profile.name}...")
+        _display_profile_provisioning(provision_profile(manifest.profile))
+        print()
+
+    downloaded_components, downloaded_configurations = _download_release(manifest, temporary_path)
+
+    print()
+    print("Préparation des comptes système...")
+
+    for system_account in _ensure_service_accounts(manifest):
+        group_status = "créé" if system_account.group_created else "déjà présent"
+        user_status = "créé" if system_account.user_created else "déjà présent"
+
+        print(f"✓ Groupe système {system_account.group_name} {group_status}.")
+        print(f"✓ Compte système {system_account.username} {user_status}.")
+
+    _install_packages(manifest, downloaded_components)
+
+    print()
+    print("Installation des fichiers de configuration...")
+
+    display_installed_configurations(_install_configurations(downloaded_configurations))
+
+    if migrate_backup_configuration():
+        print("✓ /etc/ohana-agent/plugins/backup.yaml migré vers l'identité age gérée.")
+
+    print()
+    print("Préparation de l'administration graphique...")
+
+    administration = prepare_administration(
+        agent_version=_component_version(manifest, AGENT_IDENTIFIER)
+    )
+    display_administration(administration)
+
+    if network_configuration is not None:
+        _apply_initial_network(administration, network_configuration)
+
+    if not _deploy_services(manifest, temporary_path, administration):
+        return False
+
+    if not defer_age_identity:
+        print()
+        print("Préparation de l'identité de sauvegarde INFRA-01...")
+        recipient = ensure_local_identity()
+        print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
+
+    return True
+
+
+def _download_release(
+    manifest: PlatformManifest,
+    temporary_path: Path,
+) -> tuple[tuple[DownloadedComponent, ...], tuple[DownloadedConfigurationFile, ...]]:
+    print("Téléchargement des composants...")
+
+    downloaded_components = _download_components(manifest, temporary_path)
+
+    for downloaded_component in downloaded_components:
+        component = downloaded_component.component
+        print(f"✓ {component.name} {component.version} téléchargé.")
+
+    print()
+    print("Téléchargement des configurations...")
+
+    downloaded_configurations = _download_configurations(manifest, temporary_path)
+    display_downloaded_configurations(downloaded_configurations)
+    return downloaded_components, downloaded_configurations
+
+
+def _install_packages(
+    manifest: PlatformManifest,
+    downloaded_components: tuple[DownloadedComponent, ...],
+) -> None:
+    print()
+    print("Installation d'Ohana-Agent...")
+
+    rclone_version = ensure_rclone()
+    print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
+
+    installed_agent = _install_agent(downloaded_components)
+
+    print(f"✓ {installed_agent.name} {installed_agent.version} installé.")
+    print()
+    print("Installation d'Ohana-Vision...")
+
+    installed_vision = _install_vision(downloaded_components)
+
+    print(f"✓ {installed_vision.name} {installed_vision.version} installé.")
+
+    if any(component.identifier == SHIZUNE_IDENTIFIER for component in manifest.components):
+        print()
+        print("Installation de Shizune...")
+        installed_shizune = _install_shizune(downloaded_components)
+        print(
+            f"✓ {installed_shizune.name} {installed_shizune.version} installé "
+            f"dans {installed_shizune.installation_path}."
+        )
+
+
+def _apply_initial_network(
+    administration: AdministrationPreparation,
+    network_configuration: InitialNetworkConfiguration,
+) -> None:
+    if not administration.network_enabled:
+        raise NetworkProvisioningError("NetworkManager n'est pas disponible sur cette machine.")
+    print()
+    print("Application de la configuration réseau initiale...")
+    network_state = apply_initial_network_configuration(network_configuration)
+    interface = network_state.get("interface", network_configuration.interface)
+    method = network_state.get("method", network_configuration.method)
+    print(f"✓ Interface {interface} configurée en {method}.")
+
+
+def _deploy_services(
+    manifest: PlatformManifest,
+    temporary_path: Path,
+    administration: AdministrationPreparation,
+) -> bool:
+    print()
+    print("Génération des services systemd...")
+
+    generated_services = _generate_services(manifest, temporary_path)
+    display_generated_services(generated_services)
+
+    print()
+    print("Installation des services systemd...")
+
+    installed_services = _install_services(generated_services)
+
+    for installed_service in installed_services:
+        if installed_service.created:
+            print(f"✓ {installed_service.destination_path} installé.")
+        else:
+            print(f"✓ {installed_service.destination_path} conservé (déjà identique).")
+    print()
+    print("Rechargement de systemd...")
+
+    _reload_systemd()
+
+    print("✓ Configuration systemd rechargée.")
+    activate_administration(administration)
+
+    if administration.dhcp_enabled:
+        print("✓ Surveillance du rechargement DHCP activée.")
+
+    print()
+    print("Activation des services systemd...")
+
+    _enable_services(installed_services)
+    display_service_names(installed_services, "activé")
+
+    print()
+    print("Démarrage des services systemd...")
+
+    _start_services(installed_services)
+    display_service_names(installed_services, "démarré")
+
+    print()
+    print("Vérification des services systemd...")
+
+    return display_service_statuses(_check_services(installed_services), stop_at_first_failure=True)
+
+
+def _display_explicit_capabilities(manifest: PlatformManifest) -> None:
+    if manifest.profile is None:
+        return
+
+    for capability in manifest.profile.capabilities:
+        if capability.activation != "explicit":
+            continue
+        print(
+            f"La capacité {capability.name} n'est pas activée automatiquement. "
+            f"Activez-la avec : ohana capability activate {capability.identifier}"
+        )
+
+
+def display_downloaded_configurations(
+    downloaded_configurations: tuple[DownloadedConfigurationFile, ...],
+) -> None:
+    for downloaded_configuration in downloaded_configurations:
+        print(
+            "✓ "
+            f"{downloaded_configuration.configuration_file.source} "
+            "téléchargé pour "
+            f"{downloaded_configuration.component.name}."
+        )
+
+
+def display_installed_configurations(
+    installed_configurations: tuple[InstalledConfigurationFile, ...],
+) -> None:
+    for installed_configuration in installed_configurations:
+        destination = installed_configuration.destination_path
+        ownership = (
+            f"{CONFIGURATION_OWNER}:{installed_configuration.group_name}, "
+            f"{CONFIGURATION_FILE_MODE:04o}"
+        )
+
+        if installed_configuration.created:
+            print(f"✓ {destination} installé ({ownership}).")
+        else:
+            print(f"✓ {destination} conservé (configuration locale existante, {ownership}).")
+
+
+def display_administration(administration: AdministrationPreparation) -> None:
+    if not administration.configured:
+        return
+
+    print("✓ Canal Agent/Vision sécurisé et configuré.")
+
+    if administration.dhcp_enabled:
+        print("✓ Administration DHCP dnsmasq préparée.")
+    else:
+        print("✓ DHCP absent : administration DHCP désactivée.")
+
+    if administration.network_enabled:
+        print("✓ Administration NetworkManager sécurisée.")
+
+    if administration.companion_enabled:
+        print("✓ Canal Shizune TLS préparé sans écraser la configuration locale.")
+
+
+def display_generated_services(
+    generated_services: tuple[GeneratedSystemdService, ...],
+) -> None:
+    for generated_service in generated_services:
+        print(f"✓ {generated_service.path.name} généré pour {generated_service.component.name}.")
+
+
+def display_service_names(
+    installed_services: tuple[InstalledSystemdService, ...],
+    verb: str,
+) -> None:
+    for installed_service in installed_services:
+        print(f"✓ {installed_service.destination_path.name} {verb}.")
+
+
+def display_service_statuses(
+    statuses: tuple[SystemdServiceStatus, ...],
+    *,
+    stop_at_first_failure: bool,
+) -> bool:
+    """Print each systemd status and return whether every service is active."""
+    all_active = True
+
+    for status in statuses:
+        if status.active:
+            print(f"✓ {status.service_name} est actif.")
+            continue
+
+        print(f"✗ {status.service_name} est {status.status}.")
+        all_active = False
+        if stop_at_first_failure:
+            break
+
+    return all_active
 
 
 def _generate_services(

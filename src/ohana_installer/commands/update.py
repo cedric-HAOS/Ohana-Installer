@@ -6,11 +6,12 @@ import argparse
 import os
 import sys
 import tempfile
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Literal, NoReturn
 
 from ohana_installer.administration import (
+    AdministrationPreparation,
     AdministrationPreparationError,
     activate_administration,
     prepare_administration,
@@ -20,15 +21,12 @@ from ohana_installer.commands.install import (
     AGENT_COMMAND_NAME,
     AGENT_ENVIRONMENT_PATH,
     AGENT_IDENTIFIER,
-    CONFIGURATION_FILE_MODE,
-    CONFIGURATION_OWNER,
     VISION_COMMAND_NAME,
     VISION_ENVIRONMENT_PATH,
     VISION_IDENTIFIER,
     ConfigurationInstallationError,
     _check_services,
     _component_version,
-    _display_check,
     _display_manifest,
     _display_profile_provisioning,
     _download_components,
@@ -44,6 +42,15 @@ from ohana_installer.commands.install import (
     _load_selected_manifest,
     _reload_systemd,
     _start_services,
+    display_administration,
+    display_downloaded_configurations,
+    display_environment,
+    display_generated_services,
+    display_installed_configurations,
+    display_service_names,
+    display_service_statuses,
+    failure_message,
+    failure_types,
 )
 from ohana_installer.configuration_migrations import (
     ConfigurationMigrationError,
@@ -52,6 +59,7 @@ from ohana_installer.configuration_migrations import (
 from ohana_installer.confirmation import confirm_action
 from ohana_installer.environment import run_environment_checks
 from ohana_installer.github import (
+    DownloadedComponent,
     DownloadError,
     GitHubRelease,
     GitHubReleaseAsset,
@@ -440,13 +448,50 @@ def _reject_downgrades(
             )
 
 
+_UPDATE_FAILURES: tuple[tuple[tuple[type[Exception], ...], str], ...] = (
+    ((SystemdCommandError,), "Commande systemd impossible"),
+    ((SystemdInstallationError,), "Mise à jour systemd impossible"),
+    ((SystemdGenerationError,), "Génération systemd impossible"),
+    ((DownloadError,), "Téléchargement impossible"),
+    ((ManifestError,), "Le manifeste officiel est invalide"),
+    (
+        (
+            CapabilityProvisioningError,
+            AgeIdentityError,
+            ConfigurationMigrationError,
+            PackageInstallationError,
+            RcloneInstallationError,
+        ),
+        "Mise à jour impossible",
+    ),
+    ((ConfigurationInstallationError,), "Mise à jour des configurations impossible"),
+    ((AdministrationPreparationError,), "Préparation de l'administration impossible"),
+    ((SystemAccountError,), "Vérification des comptes système impossible"),
+)
+
+
+@dataclass(frozen=True)
+class _UpdatePlan:
+    """Components that differ from the target release, and their manifest."""
+
+    manifest: PlatformManifest
+    components_to_update: tuple[ComponentManifest, ...]
+
+    @property
+    def update_manifest(self) -> PlatformManifest:
+        return replace(self.manifest, components=self.components_to_update)
+
+    @property
+    def updated_identifiers(self) -> set[str]:
+        return {component.identifier for component in self.components_to_update}
+
+
 def run(args: argparse.Namespace) -> int:
     """Exécuter la commande update."""
 
     assume_yes = bool(args.yes)
     if_needed = bool(args.if_needed)
     allow_downgrade = bool(args.allow_downgrade)
-    installer_already_checked = bool(args.installer_already_checked)
 
     try:
         release_selection = selection_from_args(args)
@@ -458,48 +503,21 @@ def run(args: argparse.Namespace) -> int:
         print(f"✗ Sélection de version invalide : {error}")
         return UPDATE_ERROR
 
-    print("Vérification de l'environnement...")
-    print()
-
-    checks = run_environment_checks()
-
-    for check in checks:
-        _display_check(check)
-
-    print()
-
-    if not all(check.success for check in checks):
-        print("L'environnement ne permet pas de poursuivre la mise à jour.")
+    if not display_environment(
+        run_environment_checks(),
+        "L'environnement ne permet pas de poursuivre la mise à jour.",
+    ):
         return UPDATE_ERROR
 
-    print("L'environnement est compatible avec Ohana-Installer.")
-    print()
-
     try:
-        installer_update: InstallerUpdateResult = "current"
-        if not installer_already_checked:
-            with tempfile.TemporaryDirectory(
-                prefix="ohana-installer-self-update-",
-            ) as installer_temporary_directory:
-                installer_update = _prepare_installer_update(
-                    Path(installer_temporary_directory),
-                    assume_yes=assume_yes,
-                )
-
-        if installer_update == "declined":
+        if not _update_installer_first(
+            args,
+            release_selection=release_selection,
+            assume_yes=assume_yes,
+            if_needed=if_needed,
+            allow_downgrade=allow_downgrade,
+        ):
             return 0
-
-        if installer_update == "updated":
-            _restart_update(
-                assume_yes=assume_yes,
-                if_needed=if_needed,
-                selection=release_selection,
-                allow_downgrade=allow_downgrade,
-            )
-
-        if migrate_backup_configuration():
-            print()
-            print("✓ /etc/ohana-agent/plugins/backup.yaml migré vers l'identité age gérée.")
 
         print()
         print("Téléchargement du catalogue et du manifeste officiels...")
@@ -508,67 +526,15 @@ def run(args: argparse.Namespace) -> int:
             prefix="ohana-installer-update-",
         ) as temporary_directory:
             temporary_path = Path(temporary_directory)
-
-            if release_selection is None:
-                manifest = _load_official_manifest(temporary_path)
-            else:
-                manifest = _load_selected_manifest(
-                    temporary_path,
-                    release_selection,
-                )
-
-            print("✓ Catalogue et manifeste téléchargés et validés.")
-            print()
-
-            _display_manifest(manifest)
-
-            print()
-
-            installed_components = _inspect_installed_components(manifest)
-            _display_update_plan(
-                manifest,
-                installed_components,
-            )
-
-            versions_are_current = _versions_are_current(
-                manifest,
-                installed_components,
-            )
-
-            profile_needs_provisioning = profile_requires_provisioning(manifest.profile)
-
-            if versions_are_current and not profile_needs_provisioning and if_needed:
-                print()
-                print("✓ Ohana-Installer, Ohana-Agent et Ohana-Vision sont déjà à jour.")
-                print("Aucun service n'a été redémarré.")
-                return 0
-
-            if versions_are_current:
-                print()
-                print(
-                    "Ohana-Agent et Ohana-Vision utilisent déjà "
-                    "les versions de la dernière release Platform."
-                )
-                print(
-                    "La composition Platform va néanmoins être réconciliée "
-                    "(configurations et services systemd)."
-                )
-
-            _reject_downgrades(
-                manifest,
-                installed_components,
+            plan = _plan_update(
+                temporary_path,
+                release_selection,
+                if_needed=if_needed,
                 allow_downgrade=allow_downgrade,
             )
 
-            components_to_update = _components_requiring_update(
-                manifest,
-                installed_components,
-            )
-            update_manifest = replace(
-                manifest,
-                components=components_to_update,
-            )
-            updated_identifiers = {component.identifier for component in components_to_update}
+            if plan is None:
+                return 0
 
             print()
 
@@ -580,272 +546,282 @@ def run(args: argparse.Namespace) -> int:
                 return 0
 
             print()
-            if manifest.profile is not None:
-                print(f"Réconciliation du profil {manifest.profile.name}...")
-                provisioning = provision_profile(manifest.profile)
-                _display_profile_provisioning(provisioning)
-                print()
-
-            print("Téléchargement des composants...")
-
-            if components_to_update:
-                downloaded_components = _download_components(
-                    update_manifest,
-                    temporary_path,
-                )
-
-                for downloaded_component in downloaded_components:
-                    component = downloaded_component.component
-                    print(f"✓ {component.name} {component.version} téléchargé.")
-            else:
-                downloaded_components = ()
-                print("✓ Aucun package Python à télécharger.")
-
-            print()
-            print("Téléchargement des configurations...")
-
-            downloaded_configurations = _download_configurations(
-                manifest,
-                temporary_path,
-            )
-
-            for downloaded_configuration in downloaded_configurations:
-                print(
-                    "✓ "
-                    f"{downloaded_configuration.configuration_file.source} "
-                    "téléchargé pour "
-                    f"{downloaded_configuration.component.name}."
-                )
-
-            print()
-            print("Vérification des comptes système...")
-
-            system_accounts = _ensure_service_accounts(manifest)
-
-            for system_account in system_accounts:
-                print(f"✓ Groupe système {system_account.group_name} prêt.")
-                print(f"✓ Compte système {system_account.username} prêt.")
-
-            print()
-            print("Génération des services systemd...")
-
-            generated_services = _generate_services(
-                manifest,
-                temporary_path,
-            )
-
-            for generated_service in generated_services:
-                print(
-                    f"✓ {generated_service.path.name} généré "
-                    f"pour {generated_service.component.name}."
-                )
-
-            print()
-            print("Vérification des fichiers de configuration...")
-
-            installed_configurations = _install_configurations(
-                downloaded_configurations,
-            )
-
-            for installed_configuration in installed_configurations:
-                destination = installed_configuration.destination_path
-
-                if installed_configuration.created:
-                    print(
-                        f"✓ {destination} installé "
-                        f"({CONFIGURATION_OWNER}:"
-                        f"{installed_configuration.group_name}, "
-                        f"{CONFIGURATION_FILE_MODE:04o})."
-                    )
-                else:
-                    print(
-                        f"✓ {destination} conservé "
-                        "(configuration locale existante, "
-                        f"{CONFIGURATION_OWNER}:"
-                        f"{installed_configuration.group_name}, "
-                        f"{CONFIGURATION_FILE_MODE:04o})."
-                    )
-
-            if AGENT_IDENTIFIER in updated_identifiers:
-                print()
-                print("Préparation des sauvegardes iCloud...")
-
-                rclone_version = ensure_rclone()
-                print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
-                recipient = ensure_local_identity()
-                print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
-
-            print()
-            print("Arrêt des services systemd...")
-
-            _stop_services(generated_services)
-
-            for generated_service in generated_services:
-                print(f"✓ {generated_service.path.name} arrêté.")
-
-            if AGENT_IDENTIFIER in updated_identifiers:
-                print()
-                print("Mise à jour d'Ohana-Agent...")
-
-                installed_agent = _install_agent(
-                    downloaded_components,
-                    replace=True,
-                )
-
-                print(f"✓ {installed_agent.name} {installed_agent.version} mis à jour.")
-
-            if VISION_IDENTIFIER in updated_identifiers:
-                print()
-                print("Mise à jour d'Ohana-Vision...")
-
-                installed_vision = _install_vision(
-                    downloaded_components,
-                    replace=True,
-                )
-
-                print(f"✓ {installed_vision.name} {installed_vision.version} mis à jour.")
-
-            if "shizune" in updated_identifiers:
-                print()
-                print("Mise à jour de Shizune...")
-                try:
-                    installed_shizune = _install_shizune(
-                        downloaded_components,
-                        replace=True,
-                    )
-                except PackageInstallationError:
-                    raise
-                print(
-                    f"✓ {installed_shizune.name} {installed_shizune.version} "
-                    f"mis à jour dans {installed_shizune.installation_path}."
-                )
-
-            print()
-            print("Préparation de l'administration graphique...")
-
-            agent_version = _component_version(manifest, AGENT_IDENTIFIER)
-            administration = prepare_administration(agent_version=agent_version)
-
-            if administration.configured:
-                print("✓ Canal Agent/Vision sécurisé et configuré.")
-
-                if administration.dhcp_enabled:
-                    print("✓ Administration DHCP dnsmasq préparée.")
-                else:
-                    print("✓ DHCP absent : administration DHCP désactivée.")
-
-                if administration.network_enabled:
-                    print("✓ Administration NetworkManager sécurisée.")
-
-                if administration.companion_enabled:
-                    print("✓ Canal Shizune TLS préparé sans écraser la configuration locale.")
-
-            print()
-            print("Mise à jour des services systemd...")
-
-            installed_services = _replace_services(
-                generated_services,
-            )
-
-            for installed_service in installed_services:
-                destination = installed_service.destination_path
-
-                if installed_service.created:
-                    print(f"✓ {destination} installé.")
-                elif installed_service.updated:
-                    print(f"✓ {destination} remplacé.")
-                else:
-                    print(f"✓ {destination} conservé (déjà identique).")
-
-            print()
-            print("Rechargement de systemd...")
-
-            _reload_systemd()
-
-            print("✓ Configuration systemd rechargée.")
-            activate_administration(administration)
-
-            if administration.dhcp_enabled:
-                print("✓ Surveillance du rechargement DHCP activée.")
-
-            print()
-            print("Activation des services systemd...")
-
-            _enable_services(installed_services)
-
-            for installed_service in installed_services:
-                print(f"✓ {installed_service.destination_path.name} activé.")
-
-            print()
-            print("Redémarrage des services systemd...")
-
-            _start_services(installed_services)
-
-            for installed_service in installed_services:
-                print(f"✓ {installed_service.destination_path.name} démarré.")
-
-            print()
-            print("Vérification des services systemd...")
-
-            statuses = _check_services(installed_services)
-
-            all_services_active = True
-
-            for status in statuses:
-                if status.active:
-                    print(f"✓ {status.service_name} est actif.")
-                else:
-                    print(f"✗ {status.service_name} est {status.status}.")
-                    all_services_active = False
-
-            if not all_services_active:
+            if not _apply_update(plan, temporary_path):
                 return UPDATE_ERROR
-
-    except SystemdCommandError as error:
-        print(f"✗ Commande systemd impossible : {error}")
-        return UPDATE_ERROR
-    except SystemdInstallationError as error:
-        print(f"✗ Mise à jour systemd impossible : {error}")
-        return UPDATE_ERROR
-    except SystemdGenerationError as error:
-        print(f"✗ Génération systemd impossible : {error}")
-        return UPDATE_ERROR
-    except DownloadError as error:
-        print(f"✗ Téléchargement impossible : {error}")
-        return UPDATE_ERROR
-    except ManifestError as error:
-        print(f"✗ Le manifeste officiel est invalide : {error}")
-        return UPDATE_ERROR
-    except (
-        CapabilityProvisioningError,
-        AgeIdentityError,
-        ConfigurationMigrationError,
-        PackageInstallationError,
-        RcloneInstallationError,
-    ) as error:
-        print(f"✗ Mise à jour impossible : {error}")
-        return UPDATE_ERROR
-    except ConfigurationInstallationError as error:
-        print(f"✗ Mise à jour des configurations impossible : {error}")
-        return UPDATE_ERROR
-    except AdministrationPreparationError as error:
-        print(f"✗ Préparation de l'administration impossible : {error}")
-        return UPDATE_ERROR
-    except SystemAccountError as error:
-        print(f"✗ Vérification des comptes système impossible : {error}")
+    except failure_types(_UPDATE_FAILURES) as error:
+        print(failure_message(error, _UPDATE_FAILURES))
         return UPDATE_ERROR
 
     print()
+    _display_update_summary(plan)
+    return 0
+
+
+def _update_installer_first(
+    args: argparse.Namespace,
+    *,
+    release_selection: ReleaseSelection | None,
+    assume_yes: bool,
+    if_needed: bool,
+    allow_downgrade: bool,
+) -> bool:
+    """Self-update Installer when needed; return False when the user declined."""
+    installer_update: InstallerUpdateResult = "current"
+    if not bool(args.installer_already_checked):
+        with tempfile.TemporaryDirectory(
+            prefix="ohana-installer-self-update-",
+        ) as installer_temporary_directory:
+            installer_update = _prepare_installer_update(
+                Path(installer_temporary_directory),
+                assume_yes=assume_yes,
+            )
+
+    if installer_update == "declined":
+        return False
+
+    if installer_update == "updated":
+        _restart_update(
+            assume_yes=assume_yes,
+            if_needed=if_needed,
+            selection=release_selection,
+            allow_downgrade=allow_downgrade,
+        )
+
+    if migrate_backup_configuration():
+        print()
+        print("✓ /etc/ohana-agent/plugins/backup.yaml migré vers l'identité age gérée.")
+
+    return True
+
+
+def _plan_update(
+    temporary_path: Path,
+    release_selection: ReleaseSelection | None,
+    *,
+    if_needed: bool,
+    allow_downgrade: bool,
+) -> _UpdatePlan | None:
+    """Compare the installed platform to the release; None when nothing to do."""
+    if release_selection is None:
+        manifest = _load_official_manifest(temporary_path)
+    else:
+        manifest = _load_selected_manifest(temporary_path, release_selection)
+
+    print("✓ Catalogue et manifeste téléchargés et validés.")
+    print()
+
+    _display_manifest(manifest)
+
+    print()
+
+    installed_components = _inspect_installed_components(manifest)
+    _display_update_plan(manifest, installed_components)
+
+    versions_are_current = _versions_are_current(manifest, installed_components)
+    profile_needs_provisioning = profile_requires_provisioning(manifest.profile)
+
+    if versions_are_current and not profile_needs_provisioning and if_needed:
+        print()
+        print("✓ Ohana-Installer, Ohana-Agent et Ohana-Vision sont déjà à jour.")
+        print("Aucun service n'a été redémarré.")
+        return None
+
+    if versions_are_current:
+        print()
+        print(
+            "Ohana-Agent et Ohana-Vision utilisent déjà "
+            "les versions de la dernière release Platform."
+        )
+        print(
+            "La composition Platform va néanmoins être réconciliée "
+            "(configurations et services systemd)."
+        )
+
+    _reject_downgrades(
+        manifest,
+        installed_components,
+        allow_downgrade=allow_downgrade,
+    )
+    return _UpdatePlan(
+        manifest=manifest,
+        components_to_update=_components_requiring_update(
+            manifest,
+            installed_components,
+        ),
+    )
+
+
+def _apply_update(plan: _UpdatePlan, temporary_path: Path) -> bool:
+    """Apply the plan, then return whether every service is active again."""
+    manifest = plan.manifest
+    updated_identifiers = plan.updated_identifiers
+
+    if manifest.profile is not None:
+        print(f"Réconciliation du profil {manifest.profile.name}...")
+        _display_profile_provisioning(provision_profile(manifest.profile))
+        print()
+
+    downloaded_components = _download_updated_components(plan, temporary_path)
+
+    print()
+    print("Téléchargement des configurations...")
+
+    downloaded_configurations = _download_configurations(manifest, temporary_path)
+    display_downloaded_configurations(downloaded_configurations)
+
+    print()
+    print("Vérification des comptes système...")
+
+    for system_account in _ensure_service_accounts(manifest):
+        print(f"✓ Groupe système {system_account.group_name} prêt.")
+        print(f"✓ Compte système {system_account.username} prêt.")
+
+    print()
+    print("Génération des services systemd...")
+
+    generated_services = _generate_services(manifest, temporary_path)
+    display_generated_services(generated_services)
+
+    print()
+    print("Vérification des fichiers de configuration...")
+
+    display_installed_configurations(_install_configurations(downloaded_configurations))
+
+    if AGENT_IDENTIFIER in updated_identifiers:
+        print()
+        print("Préparation des sauvegardes iCloud...")
+
+        rclone_version = ensure_rclone()
+        print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
+        recipient = ensure_local_identity()
+        print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
+
+    print()
+    print("Arrêt des services systemd...")
+
+    _stop_services(generated_services)
+
+    for generated_service in generated_services:
+        print(f"✓ {generated_service.path.name} arrêté.")
+
+    _replace_packages(updated_identifiers, downloaded_components)
+
+    print()
+    print("Préparation de l'administration graphique...")
+
+    administration = prepare_administration(
+        agent_version=_component_version(manifest, AGENT_IDENTIFIER)
+    )
+    display_administration(administration)
+    return _restart_services(generated_services, administration)
+
+
+def _download_updated_components(
+    plan: _UpdatePlan,
+    temporary_path: Path,
+) -> tuple[DownloadedComponent, ...]:
+    print("Téléchargement des composants...")
+
+    if not plan.components_to_update:
+        print("✓ Aucun package Python à télécharger.")
+        return ()
+
+    downloaded_components = _download_components(plan.update_manifest, temporary_path)
+
+    for downloaded_component in downloaded_components:
+        component = downloaded_component.component
+        print(f"✓ {component.name} {component.version} téléchargé.")
+
+    return downloaded_components
+
+
+def _replace_packages(
+    updated_identifiers: set[str],
+    downloaded_components: tuple[DownloadedComponent, ...],
+) -> None:
+    if AGENT_IDENTIFIER in updated_identifiers:
+        print()
+        print("Mise à jour d'Ohana-Agent...")
+
+        installed_agent = _install_agent(downloaded_components, replace=True)
+
+        print(f"✓ {installed_agent.name} {installed_agent.version} mis à jour.")
+
+    if VISION_IDENTIFIER in updated_identifiers:
+        print()
+        print("Mise à jour d'Ohana-Vision...")
+
+        installed_vision = _install_vision(downloaded_components, replace=True)
+
+        print(f"✓ {installed_vision.name} {installed_vision.version} mis à jour.")
+
+    if "shizune" in updated_identifiers:
+        print()
+        print("Mise à jour de Shizune...")
+        installed_shizune = _install_shizune(downloaded_components, replace=True)
+        print(
+            f"✓ {installed_shizune.name} {installed_shizune.version} "
+            f"mis à jour dans {installed_shizune.installation_path}."
+        )
+
+
+def _restart_services(
+    generated_services: tuple[GeneratedSystemdService, ...],
+    administration: AdministrationPreparation,
+) -> bool:
+    print()
+    print("Mise à jour des services systemd...")
+
+    installed_services = _replace_services(generated_services)
+
+    for installed_service in installed_services:
+        destination = installed_service.destination_path
+
+        if installed_service.created:
+            print(f"✓ {destination} installé.")
+        elif installed_service.updated:
+            print(f"✓ {destination} remplacé.")
+        else:
+            print(f"✓ {destination} conservé (déjà identique).")
+
+    print()
+    print("Rechargement de systemd...")
+
+    _reload_systemd()
+
+    print("✓ Configuration systemd rechargée.")
+    activate_administration(administration)
+
+    if administration.dhcp_enabled:
+        print("✓ Surveillance du rechargement DHCP activée.")
+
+    print()
+    print("Activation des services systemd...")
+
+    _enable_services(installed_services)
+    display_service_names(installed_services, "activé")
+
+    print()
+    print("Redémarrage des services systemd...")
+
+    _start_services(installed_services)
+    display_service_names(installed_services, "démarré")
+
+    print()
+    print("Vérification des services systemd...")
+
+    return display_service_statuses(
+        _check_services(installed_services), stop_at_first_failure=False
+    )
+
+
+def _display_update_summary(plan: _UpdatePlan) -> None:
+    updated_identifiers = plan.updated_identifiers
 
     if not updated_identifiers:
         print("Composition Ohana Platform réconciliée ; services redémarrés et vérifiés.")
-    elif updated_identifiers == {
-        AGENT_IDENTIFIER,
-        VISION_IDENTIFIER,
-    }:
+    elif updated_identifiers == {AGENT_IDENTIFIER, VISION_IDENTIFIER}:
         print("Ohana-Agent et Ohana-Vision sont mis à jour, redémarrés et vérifiés.")
     else:
-        component_name = components_to_update[0].name
+        component_name = plan.components_to_update[0].name
         print(f"{component_name} est mis à jour, redémarré et vérifié.")
-
-    return 0
