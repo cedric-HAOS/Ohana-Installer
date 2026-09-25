@@ -17,8 +17,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
   `systemctl restart chrony.service`. Le contenu de la demande n'est pas lu.
   L'installation et la mise à jour activent l'unité de chemin.
 - Copies de validation du manifeste et du catalogue alignées sur Platform
-  1.0.118 : Agent 1.29.19, Vision 1.22.14 et Shizune 0.3.0. Le catalogue
-  ajoute les compositions 1.0.107 à 1.0.118.
+  1.0.123 : Agent 1.34.0, Vision 1.25.0 et Shizune 0.3.0. Le catalogue
+  ajoute les compositions 1.0.107 à 1.0.123.
 - CI GitHub Actions : Ruff et pytest sous Linux, Ruff aligné sur `~=0.16.0`,
   titres de commit vérifiés (Conventional Commits).
 - Les tests de désinstallation et du menu interactif n'accèdent plus aux
