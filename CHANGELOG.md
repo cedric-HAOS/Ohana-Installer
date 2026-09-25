@@ -8,7 +8,20 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
-- Les titres de commit sont vérifiés en CI (Conventional Commits).
+- Copies de validation du manifeste et du catalogue alignées sur Platform
+  1.0.118 : Agent 1.29.19, Vision 1.22.14 et Shizune 0.3.0. Le catalogue
+  ajoute les compositions 1.0.107 à 1.0.118.
+- CI GitHub Actions : Ruff et pytest sous Linux, Ruff aligné sur `~=0.16.0`,
+  titres de commit vérifiés (Conventional Commits).
+- Les tests de désinstallation et du menu interactif n'accèdent plus aux
+  chemins système réels (`/etc/sudoers.d`, vérification de mise à jour).
+
+# [1.14.4] — Composition Agent 1.29.7 — 2026-09-19
+
+- Manifeste et catalogue alignés sur Platform 1.0.106 : Agent 1.29.7,
+  Vision 1.22.14 et Shizune 0.3.0. Le catalogue ajoute les compositions
+  1.0.98 à 1.0.106 et conserve l’historique.
+- Le délai maximal des commandes `pip` passe de 120 à 300 secondes.
 
 # [1.14.3] — Composition Tsunade/Shizune — 2026-09-11
 
