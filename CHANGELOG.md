@@ -6,6 +6,10 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ---
 
+## Non publié
+
+- Les titres de commit sont vérifiés en CI (Conventional Commits).
+
 # [1.14.3] — Composition Tsunade/Shizune — 2026-09-11
 
 - Manifeste et catalogue alignés sur Platform 1.0.97 : Agent 1.26.16,
