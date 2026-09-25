@@ -15,6 +15,10 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
   titres de commit vérifiés (Conventional Commits).
 - Les tests de désinstallation et du menu interactif n'accèdent plus aux
   chemins système réels (`/etc/sudoers.d`, vérification de mise à jour).
+- `install.run` et `update.run` sont découpés en étapes nommées
+  (complexité 43 → moins de 15 et 51 → moins de 15). Les erreurs sont
+  traduites par une table ordonnée et l'affichage est partagé entre les deux
+  commandes. Les messages restent identiques.
 
 # [1.14.4] — Composition Agent 1.29.7 — 2026-09-19
 
