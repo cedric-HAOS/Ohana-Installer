@@ -2,17 +2,48 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.118"
+  version: "1.0.123"
 
-default_platform_version: "1.0.118"
+default_platform_version: "1.0.123"
 
 releases:
+  - platform_version: "1.0.123"
+    release_tag: v1.0.123
+    agent_version: "1.34.0"
+    vision_version: "1.25.0"
+    shizune_version: "0.3.0"
+    status: recommended
+
+  - platform_version: "1.0.122"
+    release_tag: v1.0.122
+    agent_version: "1.33.0"
+    vision_version: "1.24.0"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.121"
+    release_tag: v1.0.121
+    agent_version: "1.32.0"
+    vision_version: "1.23.0"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.120"
+    release_tag: v1.0.120
+    agent_version: "1.31.0"
+    vision_version: "1.23.0"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.119"
+    release_tag: v1.0.119
+    agent_version: "1.30.0"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
   - platform_version: "1.0.118"
     release_tag: v1.0.118
     agent_version: "1.29.19"
     vision_version: "1.22.14"
     shizune_version: "0.3.0"
-    status: recommended
+    status: supported
 
   - platform_version: "1.0.117"
     release_tag: v1.0.117

@@ -8,6 +8,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.0] — Assistant de redémarrage de chrony — 2026-09-25
+
 - Assistant privilégié de redémarrage de chrony, pour Agent 1.34.0 et suivants
   sur un hôte où `/usr/sbin/chronyd` est présent : `ohana-chrony-restart.path`
   surveille `/run/ohana-agent/chrony-restart.request` et lance
