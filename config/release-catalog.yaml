@@ -2,18 +2,90 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.106"
+  version: "1.0.118"
 
-default_platform_version: "1.0.106"
+default_platform_version: "1.0.118"
 
 releases:
+  - platform_version: "1.0.118"
+    release_tag: v1.0.118
+    agent_version: "1.29.19"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: recommended
+
+  - platform_version: "1.0.117"
+    release_tag: v1.0.117
+    agent_version: "1.29.18"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.116"
+    release_tag: v1.0.116
+    agent_version: "1.29.17"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.115"
+    release_tag: v1.0.115
+    agent_version: "1.29.16"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.114"
+    release_tag: v1.0.114
+    agent_version: "1.29.15"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.113"
+    release_tag: v1.0.113
+    agent_version: "1.29.14"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.112"
+    release_tag: v1.0.112
+    agent_version: "1.29.13"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.111"
+    release_tag: v1.0.111
+    agent_version: "1.29.12"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.110"
+    release_tag: v1.0.110
+    agent_version: "1.29.11"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.109"
+    release_tag: v1.0.109
+    agent_version: "1.29.10"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.108"
+    release_tag: v1.0.108
+    agent_version: "1.29.9"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
+  - platform_version: "1.0.107"
+    release_tag: v1.0.107
+    agent_version: "1.29.8"
+    vision_version: "1.22.14"
+    shizune_version: "0.3.0"
+    status: supported
   - platform_version: "1.0.106"
     release_tag: v1.0.106
     agent_version: "1.29.7"
     vision_version: "1.22.14"
     shizune_version: "0.3.0"
-    status: recommended
-
+    status: supported
   - platform_version: "1.0.105"
     release_tag: v1.0.105
     agent_version: "1.29.6"
