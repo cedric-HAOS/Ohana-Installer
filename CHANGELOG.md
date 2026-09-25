@@ -8,6 +8,12 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Assistant privilégié de redémarrage de chrony, pour Agent 1.34.0 et suivants
+  sur un hôte où `/usr/sbin/chronyd` est présent : `ohana-chrony-restart.path`
+  surveille `/run/ohana-agent/chrony-restart.request` et lance
+  `ohana-chrony-restart.service`, dont la seule commande est
+  `systemctl restart chrony.service`. Le contenu de la demande n'est pas lu.
+  L'installation et la mise à jour activent l'unité de chemin.
 - Copies de validation du manifeste et du catalogue alignées sur Platform
   1.0.118 : Agent 1.29.19, Vision 1.22.14 et Shizune 0.3.0. Le catalogue
   ajoute les compositions 1.0.107 à 1.0.118.

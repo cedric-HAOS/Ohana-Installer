@@ -11,6 +11,7 @@ import yaml
 
 from ohana_installer import administration as administration_module
 from ohana_installer.administration import (
+    CHRONY_RESTART_PATH_NAME,
     DHCP_RELOAD_HELPER_PATH,
     DHCP_RELOAD_PATH_NAME,
     AdministrationPreparation,
@@ -105,6 +106,7 @@ def test_prepare_administration_configures_dnsmasq_once(
         "vision_token_path": (vision_configuration.parent / "management.token"),
         "dnsmasq_executable": dnsmasq,
         "dnsmasq_configuration_directory": (dnsmasq_directory),
+        "chronyd_executable": tmp_path / "missing-chronyd",
         "systemd_directory": systemd_directory,
         "require_linux": False,
         "secure_ownership": False,
@@ -215,6 +217,90 @@ def test_activate_administration_starts_path_unit(
 
     assert enabled == [DHCP_RELOAD_PATH_NAME]
     assert started == [DHCP_RELOAD_PATH_NAME]
+
+
+def _prepare_with_chrony(tmp_path: Path, monkeypatch, *, agent_version: str | None, chronyd: bool):
+    # Only the chrony helper is under test: no Katsuyu TLS nor network helper.
+    for name in ("supports_distributed_jobs_tls", "supports_network_administration"):
+        monkeypatch.setattr(administration_module, name, lambda _version: False)
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    chronyd_path = tmp_path / "chronyd"
+    if chronyd:
+        chronyd_path.touch()
+    systemd_directory = tmp_path / "systemd"
+    result = prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        chronyd_executable=chronyd_path,
+        systemd_directory=systemd_directory,
+        require_linux=False,
+        secure_ownership=False,
+        agent_version=agent_version,
+    )
+    return result, systemd_directory
+
+
+def test_prepare_administration_installs_the_restricted_chrony_helper(
+    tmp_path: Path, monkeypatch
+) -> None:
+    result, systemd_directory = _prepare_with_chrony(
+        tmp_path, monkeypatch, agent_version="1.34.0", chronyd=True
+    )
+
+    assert result.chrony_restart_enabled is True
+    assert result.dhcp_enabled is False
+    assert [path.name for path in result.units_installed] == [
+        "ohana-chrony-restart.service",
+        "ohana-chrony-restart.path",
+    ]
+    path_unit = (systemd_directory / "ohana-chrony-restart.path").read_text(encoding="utf-8")
+    assert "PathChanged=/run/ohana-agent/chrony-restart.request" in path_unit
+    assert "Unit=ohana-chrony-restart.service" in path_unit
+    assert "WantedBy=multi-user.target" in path_unit
+    service = (systemd_directory / "ohana-chrony-restart.service").read_text(encoding="utf-8")
+    # The root service has one fixed command: the request cannot choose it.
+    exec_lines = [line for line in service.splitlines() if line.startswith("Exec")]
+    assert exec_lines == ["ExecStart=/usr/bin/systemctl restart chrony.service"]
+    assert "Type=oneshot" in service
+
+
+@pytest.mark.parametrize(
+    ("agent_version", "chronyd"),
+    [("1.33.0", True), ("1.34.0", False)],
+)
+def test_prepare_administration_skips_chrony_helper_when_unusable(
+    tmp_path: Path, monkeypatch, agent_version: str, chronyd: bool
+) -> None:
+    result, systemd_directory = _prepare_with_chrony(
+        tmp_path, monkeypatch, agent_version=agent_version, chronyd=chronyd
+    )
+
+    assert result.chrony_restart_enabled is False
+    assert result.units_installed == ()
+    assert not (systemd_directory / "ohana-chrony-restart.path").exists()
+
+
+def test_activate_administration_starts_the_chrony_path_unit(monkeypatch) -> None:
+    enabled: list[str] = []
+    started: list[str] = []
+    monkeypatch.setattr("ohana_installer.administration.enable_systemd_service", enabled.append)
+    monkeypatch.setattr("ohana_installer.administration.start_systemd_service", started.append)
+
+    activate_administration(
+        AdministrationPreparation(
+            configured=True,
+            dhcp_enabled=True,
+            token_created=False,
+            chrony_restart_enabled=True,
+        )
+    )
+
+    assert enabled == started == [DHCP_RELOAD_PATH_NAME, CHRONY_RESTART_PATH_NAME]
 
 
 def test_prepare_administration_secures_plugin_configurations(

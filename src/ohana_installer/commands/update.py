@@ -795,6 +795,9 @@ def _restart_services(
     if administration.dhcp_enabled:
         print("✓ Surveillance du rechargement DHCP activée.")
 
+    if administration.chrony_restart_enabled:
+        print("✓ Surveillance des redémarrages supervisés de chrony activée.")
+
     print()
     print("Activation des services systemd...")
 

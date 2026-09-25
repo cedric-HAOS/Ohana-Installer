@@ -64,6 +64,10 @@ SYSTEMD_SYSTEM_DIRECTORY = Path("/etc/systemd/system")
 DHCP_RELOAD_SERVICE_NAME = "ohana-dhcp-reload.service"
 DHCP_RELOAD_PATH_NAME = "ohana-dhcp-reload.path"
 DHCP_RELOAD_HELPER_PATH = Path("/opt/ohana-agent/venv/bin/ohana-agent-dhcp-reload-helper")
+CHRONYD_EXECUTABLE = Path("/usr/sbin/chronyd")
+CHRONY_RESTART_SERVICE_NAME = "ohana-chrony-restart.service"
+CHRONY_RESTART_PATH_NAME = "ohana-chrony-restart.path"
+CHRONY_RESTART_REQUEST_PATH = "/run/ohana-agent/chrony-restart.request"
 NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
@@ -71,6 +75,7 @@ WAKE_ON_LAN_MINIMUM_AGENT_VERSION = (1, 18, 0)
 WAKE_ON_LAN_BATCHING_MINIMUM_AGENT_VERSION = (1, 26, 4)
 INFRA_LOG_SOURCE_MINIMUM_AGENT_VERSION = (1, 26, 12)
 SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION = (1, 24, 0)
+CHRONY_RESTART_MINIMUM_AGENT_VERSION = (1, 34, 0)
 
 
 class AdministrationPreparationError(RuntimeError):
@@ -88,6 +93,7 @@ class AdministrationPreparation:
     jobs_enabled: bool = False
     worker_tls_enabled: bool = False
     companion_enabled: bool = False
+    chrony_restart_enabled: bool = False
     units_installed: tuple[Path, ...] = ()
 
 
@@ -101,6 +107,7 @@ def prepare_administration(
     vision_companion_ca_path: Path = VISION_COMPANION_CA_PATH,
     dnsmasq_executable: Path = DNSMASQ_EXECUTABLE,
     dnsmasq_configuration_directory: Path = (DNSMASQ_CONFIGURATION_DIRECTORY),
+    chronyd_executable: Path = CHRONYD_EXECUTABLE,
     systemd_directory: Path = SYSTEMD_SYSTEM_DIRECTORY,
     require_linux: bool = True,
     secure_ownership: bool = True,
@@ -290,6 +297,14 @@ def prepare_administration(
             purge_stale_leases=dhcp_lease_purge_supported,
         )
 
+    chrony_restart_enabled = supports_chrony_restart(agent_version) and chronyd_executable.is_file()
+
+    if chrony_restart_enabled:
+        installed_units = (
+            *installed_units,
+            *_install_chrony_restart_units(systemd_directory),
+        )
+
     return AdministrationPreparation(
         configured=True,
         dhcp_enabled=dhcp_enabled,
@@ -298,6 +313,7 @@ def prepare_administration(
         jobs_enabled=jobs_tls_supported,
         worker_tls_enabled=jobs_tls_supported,
         companion_enabled=companion_supported,
+        chrony_restart_enabled=chrony_restart_enabled,
         units_installed=installed_units,
     )
 
@@ -305,16 +321,18 @@ def prepare_administration(
 def activate_administration(
     preparation: AdministrationPreparation,
 ) -> None:
-    """Activer l'unité de surveillance du rechargement DHCP."""
-    if not preparation.configured or not preparation.dhcp_enabled:
+    """Activer les unités de surveillance des demandes privilégiées."""
+    if not preparation.configured:
         return
 
-    enable_systemd_service(
-        DHCP_RELOAD_PATH_NAME,
-    )
-    start_systemd_service(
-        DHCP_RELOAD_PATH_NAME,
-    )
+    path_units = [
+        *([DHCP_RELOAD_PATH_NAME] if preparation.dhcp_enabled else []),
+        *([CHRONY_RESTART_PATH_NAME] if preparation.chrony_restart_enabled else []),
+    ]
+
+    for path_unit in path_units:
+        enable_systemd_service(path_unit)
+        start_systemd_service(path_unit)
 
 
 def _resolve_token(
@@ -1099,6 +1117,14 @@ def supports_shizune_companion(agent_version: str | None) -> bool:
     )
 
 
+def supports_chrony_restart(agent_version: str | None) -> bool:
+    """Indiquer si l'Agent sait demander le redémarrage supervisé de chrony."""
+    return _supports_agent_version(
+        agent_version,
+        minimum=CHRONY_RESTART_MINIMUM_AGENT_VERSION,
+    )
+
+
 def _supports_agent_version(
     agent_version: str | None,
     *,
@@ -1320,3 +1346,40 @@ def _reload_path_content() -> str:
             "",
         ]
     )
+
+
+def _install_chrony_restart_units(systemd_directory: Path) -> tuple[Path, ...]:
+    """Installer l'assistant qui ne peut que redémarrer chrony.
+
+    L'Agent écrit une demande sans privilège ; l'unité de chemin la voit et
+    lance un service root dont la seule commande est fixe. Le contenu de la
+    demande n'est pas lu : il ne peut ni choisir l'unité ni ajouter d'argument.
+    """
+    systemd_directory.mkdir(parents=True, exist_ok=True)
+    units = {
+        systemd_directory / CHRONY_RESTART_SERVICE_NAME: [
+            "[Unit]",
+            "Description=Restart chrony after an authorized Ohana repair",
+            "After=chrony.service",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            "ExecStart=/usr/bin/systemctl restart chrony.service",
+        ],
+        systemd_directory / CHRONY_RESTART_PATH_NAME: [
+            "[Unit]",
+            "Description=Watch Ohana chrony restart requests",
+            "",
+            "[Path]",
+            f"PathChanged={CHRONY_RESTART_REQUEST_PATH}",
+            f"Unit={CHRONY_RESTART_SERVICE_NAME}",
+            "",
+            "[Install]",
+            "WantedBy=multi-user.target",
+        ],
+    }
+    for path, lines in units.items():
+        path.write_text("\n".join([*lines, ""]), encoding="utf-8", newline="\n")
+        path.chmod(0o644)
+
+    return tuple(units)
