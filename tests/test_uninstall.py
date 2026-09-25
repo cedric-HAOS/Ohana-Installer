@@ -17,6 +17,27 @@ from ohana_installer.systemd import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolate_system_paths(monkeypatch, tmp_path: Path) -> None:
+    """Ne jamais sonder /etc ni /usr réels : sous Linux, /etc/sudoers.d est illisible."""
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.NETWORK_HELPER_PATH",
+        tmp_path / "network-helper",
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.NETWORK_SUDOERS_PATH",
+        tmp_path / "sudoers",
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.NETWORK_STATE_DIRECTORY",
+        tmp_path / "network-state",
+    )
+    monkeypatch.setattr(
+        "ohana_installer.commands.uninstall.SYSTEMD_SYSTEM_DIRECTORY",
+        tmp_path / "systemd",
+    )
+
+
 def test_uninstall_removes_services_and_components(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],

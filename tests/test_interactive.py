@@ -36,6 +36,15 @@ from ohana_installer.network import (
 from ohana_installer.system_capabilities import CapabilityStatus
 
 
+@pytest.fixture(autouse=True)
+def skip_installer_update_check(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Sous POSIX, run() vérifierait réellement la mise à jour d'Installer."""
+    monkeypatch.setattr(
+        "ohana_installer.interactive._check_installer_before_menu",
+        lambda output: None,
+    )
+
+
 @dataclass
 class ScriptedInput:
     answers: list[str]
