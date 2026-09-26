@@ -8,6 +8,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.1] — Copies de Platform 1.0.128 — 2026-09-26
+
 - Menu interactif : installation et bascule de la mise à jour automatique
   extraites de la boucle du menu (complexité 30 → 19), sans changement de
   comportement.
