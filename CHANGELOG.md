@@ -11,6 +11,9 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 - Menu interactif : installation et bascule de la mise à jour automatique
   extraites de la boucle du menu (complexité 30 → 19), sans changement de
   comportement.
+- Copies de validation du manifeste et du catalogue alignées sur Platform
+  1.0.128 : Agent 1.36.1, Vision 1.27.1 et Shizune 0.3.0. Le catalogue
+  ajoute les compositions 1.0.124 à 1.0.128.
 
 # [1.15.0] — Assistant de redémarrage de chrony — 2026-09-25
 
