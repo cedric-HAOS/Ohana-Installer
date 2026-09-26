@@ -734,6 +734,29 @@ def _configure_network(
         return 3
 
 
+def _install(command_runner: CommandRunner, output: TextIO) -> tuple[int, bool]:
+    """Installer puis préparer l'identité age ; indique si elle est prête."""
+    _render_step_artwork(output, "install")
+    result = command_runner(["install"])
+    if result != 0 or os.name != "posix":
+        return result, False
+    try:
+        ensure_local_identity()
+    except AgeIdentityError as error:
+        _write(output, f"⚠ Identité age non préparée : {error}")
+        return 3, False
+    return result, True
+
+
+def _toggle_automatic_update(command_runner: CommandRunner, output: TextIO) -> int:
+    _render_step_artwork(output, "automatic-update")
+    try:
+        action = "disable" if automatic_update_is_enabled() else "enable"
+    except AutomaticUpdateError:
+        action = "enable"
+    return command_runner(["automatic-update", action])
+
+
 def run(
     *,
     command_runner: CommandRunner,
@@ -777,35 +800,22 @@ def run(
             _write(destination)
             return 0
 
+        if choice in {"8", "q", "Q"}:
+            _render_step_artwork(destination, "quit")
+            _write(destination, "Au revoir.")
+            return 0
         if choice == "1":
-            _render_step_artwork(destination, "install")
-            result = command_runner(["install"])
-            if result == 0 and os.name == "posix":
-                try:
-                    ensure_local_identity()
-                    identity_checked = True
-                except AgeIdentityError as error:
-                    _write(destination, f"⚠ Identité age non préparée : {error}")
-                    result = 3
-            _pause(input_reader, destination)
-            if result not in {0, 3}:
-                return result
+            result, identity_ready = _install(command_runner, destination)
+            identity_checked = identity_checked or identity_ready
         elif choice == "2":
             result = _restore_infra_01(
                 command_runner=command_runner,
                 input_function=input_reader,
                 output=destination,
             )
-            if result is not None:
-                _pause(input_reader, destination)
-                if result not in {0, 3}:
-                    return result
         elif choice == "3":
             _render_step_artwork(destination, "update")
             result = command_runner(["update", "--installer-already-checked"])
-            _pause(input_reader, destination)
-            if result not in {0, 3}:
-                return result
         elif choice == "4":
             result = _run_selected_release(
                 command_runner=command_runner,
@@ -813,41 +823,26 @@ def run(
                 output=destination,
                 status=status,
             )
-            if result is not None:
-                _pause(input_reader, destination)
-                if result not in {0, 3}:
-                    return result
         elif choice == "5":
             result = _manage_capabilities(
                 command_runner=command_runner,
                 input_function=input_reader,
                 output=destination,
             )
-            if result is not None:
-                _pause(input_reader, destination)
-                if result not in {0, 3}:
-                    return result
         elif choice == "6":
             result = _configure_network(
                 input_function=input_reader,
                 output=destination,
             )
-            if result is not None:
-                _pause(input_reader, destination)
         elif choice == "7":
-            _render_step_artwork(destination, "automatic-update")
-            try:
-                action = "disable" if automatic_update_is_enabled() else "enable"
-            except AutomaticUpdateError:
-                action = "enable"
-            result = command_runner(["automatic-update", action])
-            _pause(input_reader, destination)
-            if result not in {0, 3}:
-                return result
-        elif choice in {"8", "q", "Q"}:
-            _render_step_artwork(destination, "quit")
-            _write(destination, "Au revoir.")
-            return 0
+            result = _toggle_automatic_update(command_runner, destination)
         else:
             _write(destination, "Choix invalide.")
             _pause(input_reader, destination)
+            continue
+        if result is None:
+            continue
+        _pause(input_reader, destination)
+        # A network failure keeps the menu open; other failures end it.
+        if choice != "6" and result not in {0, 3}:
+            return result

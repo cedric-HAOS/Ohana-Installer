@@ -8,6 +8,10 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Menu interactif : installation et bascule de la mise à jour automatique
+  extraites de la boucle du menu (complexité 30 → 19), sans changement de
+  comportement.
+
 # [1.15.0] — Assistant de redémarrage de chrony — 2026-09-25
 
 - Assistant privilégié de redémarrage de chrony, pour Agent 1.34.0 et suivants
