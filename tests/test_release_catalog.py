@@ -61,10 +61,10 @@ def test_load_release_catalog_reads_repository_catalog() -> None:
     repository_root = Path(__file__).resolve().parents[1]
     catalog = load_release_catalog(repository_root / "config" / "release-catalog.yaml")
 
-    assert catalog.platform_version == "1.0.126"
-    assert catalog.default_platform_version == "1.0.126"
+    assert catalog.platform_version == "1.0.127"
+    assert catalog.default_platform_version == "1.0.127"
     assert catalog.releases[0].agent_version == "1.36.0"
-    assert catalog.releases[0].vision_version == "1.26.0"
+    assert catalog.releases[0].vision_version == "1.27.0"
     assert catalog.releases[0].shizune_version == "0.3.0"
     assert catalog.releases[-1].platform_version == "1.0.13"
 
