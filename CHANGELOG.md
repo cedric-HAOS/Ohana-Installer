@@ -8,6 +8,9 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Copies de validation du manifeste et du catalogue alignées sur Platform
+  1.0.129 : Agent 1.37.0, Vision 1.28.0 et Shizune 0.3.0.
+
 # [1.15.1] — Copies de Platform 1.0.128 — 2026-09-26
 
 - Menu interactif : installation et bascule de la mise à jour automatique
