@@ -8,6 +8,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.2] — Copie iCloud non bloquante — 2026-09-28
+
 - Mise à jour : une copie de récupération iCloud impossible ne bloque plus le
   déploiement quand l'identité age existait déjà (sa copie iCloud date d'une
   installation ou d'une mise à jour précédente). L'échec s'affiche en
@@ -17,7 +19,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
   avant l'arrêt des services. Une identité créée pendant la mise à jour n'a
   aucune copie : l'échec reste bloquant.
 - Copies de validation du manifeste et du catalogue alignées sur Platform
-  1.0.129 : Agent 1.37.0, Vision 1.28.0 et Shizune 0.3.0.
+  1.0.131 : Agent 1.38.1, Vision 1.29.1 et Shizune 0.3.0. Le catalogue
+  ajoute les compositions 1.0.129 à 1.0.131.
 
 # [1.15.1] — Copies de Platform 1.0.128 — 2026-09-26
 
