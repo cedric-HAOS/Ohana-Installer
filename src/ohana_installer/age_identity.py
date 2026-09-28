@@ -189,6 +189,29 @@ def ensure_local_identity(
     return recipient
 
 
+def refresh_local_identity(
+    *,
+    command_runner: CommandRunner = subprocess.run,
+) -> tuple[str, str | None]:
+    """Préparer l'identité pour une mise à jour; rendre l'échec iCloud non bloquant.
+
+    Une identité déjà présente a été copiée dans iCloud lors d'une installation ou
+    d'une mise à jour précédente : une session iCloud expirée (rclone 421
+    « Invalid global session », 28 septembre) ne doit pas bloquer le déploiement.
+    Une identité créée maintenant n'a aucune copie : l'échec reste bloquant.
+    """
+
+    existed = IDENTITY_PATH.is_file()
+    recipient = create_identity(command_runner=command_runner)
+    try:
+        upload_recovery_identity(command_runner=command_runner)
+    except AgeIdentityError as error:
+        if not existed:
+            raise
+        return recipient, str(error)
+    return recipient, None
+
+
 def download_recovery_identity(
     destination: Path,
     *,

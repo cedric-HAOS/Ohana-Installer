@@ -64,6 +64,69 @@ def test_ensure_local_identity_creates_public_files_and_uploads_recovery(
     assert any(age_identity.RECOVERY_REMOTE_PATH in command for command in commands)
 
 
+def _expired_icloud_runner(command, **_kwargs):
+    normalized = tuple(command)
+    if "-o" in normalized:
+        Path(normalized[-1]).write_text("AGE-SECRET-KEY-1TEST\n", encoding="utf-8")
+        return _result(command)
+    if "-y" in normalized:
+        return _result(command, stdout="age1managedrecipient\n")
+    if "copyto" in normalized:
+        # INFRA-01, 28 September: the iCloud session had expired.
+        return _result(
+            command,
+            code=1,
+            stderr='HTTP error 421 (421 Misdirected Request) "Invalid global session"',
+        )
+    return _result(command)
+
+
+@pytest.mark.parametrize("existed", [True, False])
+def test_refresh_local_identity_tolerates_icloud_only_for_an_existing_key(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    existed: bool,
+) -> None:
+    _redirect_paths(monkeypatch, tmp_path)
+    rclone_config = tmp_path / "rclone.conf"
+    rclone_config.write_text("[icloud]\n", encoding="utf-8")
+    monkeypatch.setattr(age_identity, "RCLONE_CONFIG_PATH", rclone_config)
+    if existed:
+        age_identity.IDENTITY_DIRECTORY.mkdir(parents=True)
+        age_identity.IDENTITY_PATH.write_text("AGE-SECRET-KEY-1TEST\n", encoding="utf-8")
+
+    if not existed:
+        # A key created now has no recovery copy anywhere: stay blocking.
+        with pytest.raises(age_identity.AgeIdentityError, match="Invalid global session"):
+            age_identity.refresh_local_identity(command_runner=_expired_icloud_runner)
+        return
+
+    recipient, warning = age_identity.refresh_local_identity(command_runner=_expired_icloud_runner)
+    assert recipient == "age1managedrecipient"
+    assert warning is not None and "Invalid global session" in warning
+
+
+def test_refresh_local_identity_reports_no_warning_after_a_copy(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _redirect_paths(monkeypatch, tmp_path)
+    monkeypatch.setattr(age_identity, "RCLONE_CONFIG_PATH", tmp_path / "absent.conf")
+
+    def runner(command, **_kwargs):
+        normalized = tuple(command)
+        if "-o" in normalized:
+            Path(normalized[-1]).write_text("AGE-SECRET-KEY-1TEST\n", encoding="utf-8")
+        if "-y" in normalized:
+            return _result(command, stdout="age1managedrecipient\n")
+        return _result(command)
+
+    assert age_identity.refresh_local_identity(command_runner=runner) == (
+        "age1managedrecipient",
+        None,
+    )
+
+
 def test_download_recovery_identity_validates_recipient(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

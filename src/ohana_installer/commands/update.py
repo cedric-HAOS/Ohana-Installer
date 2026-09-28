@@ -16,7 +16,7 @@ from ohana_installer.administration import (
     activate_administration,
     prepare_administration,
 )
-from ohana_installer.age_identity import AgeIdentityError, ensure_local_identity
+from ohana_installer.age_identity import AgeIdentityError, refresh_local_identity
 from ohana_installer.commands.install import (
     AGENT_COMMAND_NAME,
     AGENT_ENVIRONMENT_PATH,
@@ -693,8 +693,18 @@ def _apply_update(plan: _UpdatePlan, temporary_path: Path) -> bool:
 
         rclone_version = ensure_rclone()
         print(f"✓ rclone {rclone_version} installé pour les sauvegardes iCloud.")
-        recipient = ensure_local_identity()
+        recipient, recovery_warning = refresh_local_identity()
         print(f"✓ Identité age INFRA-01 préparée ({recipient[:16]}…).")
+        if recovery_warning is not None:
+            print(
+                "⚠ Copie de récupération iCloud impossible, mise à jour poursuivie "
+                "(la copie existante est conservée) : "
+                f"{recovery_warning[:300]}"
+            )
+            print(
+                "  Reconnecter iCloud : sudo rclone config reconnect icloud: "
+                "--config /etc/ohana-agent/rclone.conf"
+            )
 
     print()
     print("Arrêt des services systemd...")

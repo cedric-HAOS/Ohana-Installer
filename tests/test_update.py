@@ -67,8 +67,8 @@ def _prepare_administration_without_system_changes(
         lambda _administration: None,
     )
     monkeypatch.setattr(
-        "ohana_installer.commands.update.ensure_local_identity",
-        lambda: "age1managedrecipient",
+        "ohana_installer.commands.update.refresh_local_identity",
+        lambda: ("age1managedrecipient", None),
     )
 
 
@@ -358,9 +358,14 @@ def test_restart_update_reexecutes_current_python(
     )
 
 
+@pytest.mark.parametrize(
+    "recovery_warning",
+    [None, 'HTTP error 421 (421 Misdirected Request) "Invalid global session"'],
+)
 def test_update_updates_and_restarts_official_components(
     monkeypatch,
     capsys: pytest.CaptureFixture[str],
+    recovery_warning: str | None,
 ) -> None:
     manifest = _build_manifest()
     generated_services = _build_generated_services(
@@ -416,8 +421,8 @@ def test_update_updates_and_restarts_official_components(
         lambda downloaded_files: operations.append("config") or (),
     )
     monkeypatch.setattr(
-        "ohana_installer.commands.update.ensure_local_identity",
-        lambda: operations.append("age-identity") or "age1managedrecipient",
+        "ohana_installer.commands.update.refresh_local_identity",
+        lambda: operations.append("age-identity") or ("age1managedrecipient", recovery_warning),
     )
     monkeypatch.setattr(
         "ohana_installer.commands.update._stop_services",
@@ -502,6 +507,8 @@ def test_update_updates_and_restarts_official_components(
     assert "Compte système ohana prêt" in output
     assert "Vérification des fichiers de configuration" in output
     assert "Identité age INFRA-01 préparée" in output
+    # An expired iCloud session no longer blocks the deployment (28 September).
+    assert ("Copie de récupération iCloud impossible" in output) is (recovery_warning is not None)
     assert "Arrêt des services systemd" in output
     assert "Ohana-Agent 1.1.0 mis à jour" in output
     assert "Ohana-Vision 1.1.0 mis à jour" in output
