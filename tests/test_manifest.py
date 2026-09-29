@@ -424,7 +424,7 @@ def test_repository_manifest_is_valid() -> None:
     manifest = load_manifest(manifest_path)
 
     assert manifest.platform_name == "Ohana"
-    assert manifest.platform_version == "1.0.137"
+    assert manifest.platform_version == "1.0.138"
     assert manifest.runtime.minimum_python_version == "3.13"
     assert {component.identifier for component in manifest.components} == {
         "agent",
@@ -446,9 +446,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.43.1"
-    assert agent.release_tag == "v1.43.1"
-    assert agent.package.filename == ("ohana_agent-1.43.1-py3-none-any.whl")
+    assert agent.version == "1.44.0"
+    assert agent.release_tag == "v1.44.0"
+    assert agent.package.filename == ("ohana_agent-1.44.0-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
@@ -497,9 +497,9 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/zwave.yaml",
     )
 
-    assert vision.version == "1.34.1"
-    assert vision.release_tag == "v1.34.1"
-    assert vision.package.filename == ("ohana_vision-1.34.1-py3-none-any.whl")
+    assert vision.version == "1.35.0"
+    assert vision.release_tag == "v1.35.0"
+    assert vision.package.filename == ("ohana_vision-1.35.0-py3-none-any.whl")
     assert vision.configuration is not None
     assert vision.service is not None
     assert vision.service.user == "ohana-vision"
@@ -511,9 +511,9 @@ def test_repository_manifest_is_valid() -> None:
     shizune = next(
         component for component in manifest.components if component.identifier == "shizune"
     )
-    assert shizune.version == "0.4.0"
+    assert shizune.version == "0.5.0"
     assert shizune.package.type == "static"
-    assert shizune.package.filename == "shizune-pwa-0.4.0.tar.gz"
+    assert shizune.package.filename == "shizune-pwa-0.5.0.tar.gz"
     assert shizune.static is not None
     assert shizune.static.directory == Path("/var/www/shizune")
 
