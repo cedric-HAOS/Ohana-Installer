@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.138"
+  version: "1.0.139"
 
 runtime:
   python:
@@ -114,12 +114,12 @@ components:
   vision:
     name: Ohana-Vision
     repository: cedric-HAOS/Ohana-Vision
-    version: "1.35.0"
-    release_tag: v1.35.0
+    version: "1.36.0"
+    release_tag: v1.36.0
 
     package:
       type: wheel
-      filename: ohana_vision-1.35.0-py3-none-any.whl
+      filename: ohana_vision-1.36.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-vision
