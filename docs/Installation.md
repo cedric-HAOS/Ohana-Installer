@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.8.0**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.15.3**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée
@@ -47,15 +47,15 @@ sudo reboot
 ## 3. Télécharger la release officielle
 
 ```bash
-mkdir -p "$HOME/ohana-installer-1.8.0"
-cd "$HOME/ohana-installer-1.8.0"
+mkdir -p "$HOME/ohana-installer-1.15.3"
+cd "$HOME/ohana-installer-1.15.3"
 
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.8.0/ohana_installer-1.8.0-py3-none-any.whl
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.15.3/ohana_installer-1.15.3-py3-none-any.whl
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.8.0/ohana_installer-1.8.0.tar.gz
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.15.3/ohana_installer-1.15.3.tar.gz
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.8.0/SHA256SUMS
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.15.3/SHA256SUMS
 ```
 
 ## 4. Vérifier les artefacts
@@ -75,7 +75,7 @@ Raspberry Pi OS.
 ```bash
 sudo python3.13 -m venv /opt/ohana-installer
 sudo /opt/ohana-installer/bin/python -m pip install \
-  ./ohana_installer-1.8.0-py3-none-any.whl
+  ./ohana_installer-1.15.3-py3-none-any.whl
 sudo ln -sfn /opt/ohana-installer/bin/ohana /usr/local/bin/ohana
 ```
 
@@ -88,7 +88,7 @@ ohana --version
 Résultat attendu :
 
 ```text
-ohana 1.8.0
+ohana 1.15.3
 ```
 
 ## 6. Ouvrir Ohana-Installer
@@ -100,15 +100,18 @@ sudo ohana
 Le menu propose :
 
 ```text
-1. Installer ou mettre à jour Agent et Vision
-2. Installer une composition antérieure
-3. Configurer le réseau d’INFRA-01
-4. Mise à jour automatique : désactivée
-5. Quitter
+1. Installer une nouvelle machine INFRA-01
+2. Restaurer INFRA-01 depuis une sauvegarde
+3. Mettre à jour une installation Ohana
+4. Installer une composition antérieure
+5. Gérer les capacités d’INFRA-01
+6. Configurer le réseau d’INFRA-01
+7. Mise à jour automatique : désactivée
+8. Quitter
 ```
 
-Choisir **1** pour une installation neuve ou une mise à jour vers la composition
-recommandée. Les commandes explicites restent disponibles, notamment :
+Choisir **1** pour une installation neuve, **2** pour restaurer une sauvegarde
+ou **3** pour mettre à jour une installation existante. Les commandes explicites restent disponibles, notamment :
 
 ```bash
 sudo ohana install
@@ -288,3 +291,21 @@ sudo ohana network --yes \
 
 Le helper NetworkManager nécessite une installation compatible avec Ohana-Agent
 1.11.0 ou une version ultérieure.
+
+## Remise en service après perte de la carte SD
+
+Garder le DHCP de la box actif. Après installation de cet outil sur un système
+neuf, lancer directement `sudo ohana restore --icloud --choose-backup`, sans
+installer Agent/Vision auparavant. Une installation partielle peut être reprise.
+Choisir une sauvegarde antérieure à la panne. Installer récupère l’identité age
+sur iCloud, contrôle l’archive et réinstalle la composition sauvegardée.
+
+Les descripteurs avec `contents` sont acceptés depuis 1.15.3 : l’inventaire et les
+éléments déclarés sont vérifiés, puis les métadonnées sont comparées strictement.
+Les sauvegardes historiques sans ce champ restent compatibles.
+
+Depuis la console du Raspberry, rétablir ensuite le réseau statique via le menu
+**Configurer le réseau d’INFRA-01**. La configuration NetworkManager ne fait pas
+partie de l’archive. Vérifier Agent, Vision et Chrony avant de désactiver le DHCP
+de la box et d’activer celui d’INFRA-01. En cas d’échec, désactiver la capacité
+DHCP d’INFRA-01 avant de réactiver celle de la box.

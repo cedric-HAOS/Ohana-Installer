@@ -32,6 +32,7 @@ ALLOWED_ARCHIVE_ROOTS = (
     PurePosixPath("ohana-backup/descriptor.json"),
 )
 DESCRIPTOR_PATH = PurePosixPath("ohana-backup/descriptor.json")
+REQUIRED_PAYLOAD_ROOTS = ALLOWED_ARCHIVE_ROOTS[:-1]
 SERVICE_ORDER = (
     "ohana-agent.service",
     "ohana-vision.service",
@@ -320,6 +321,23 @@ def _verify_and_remove_descriptor(
         "agent_version": manifest.agent_version,
         "vision_version": manifest.vision_version,
     }
+    if not isinstance(descriptor, dict):
+        raise RestoreError("Le descripteur chiffré doit être un objet JSON.")
+    if "contents" in descriptor:
+        contents = descriptor.pop("contents")
+        required = {str(root) for root in REQUIRED_PAYLOAD_ROOTS}
+        if (
+            not isinstance(contents, list)
+            or not all(isinstance(item, str) for item in contents)
+            or len(contents) != len(required)
+            or set(contents) != required
+        ):
+            raise RestoreError("L'inventaire du descripteur chiffré est invalide.")
+        for root in REQUIRED_PAYLOAD_ROOTS:
+            path = extracted.joinpath(*root.parts)
+            present = path.is_file() if root.suffix else path.is_dir()
+            if not present:
+                raise RestoreError(f"Élément déclaré absent de l'archive : {root}.")
     if descriptor != expected:
         raise RestoreError(
             "Le manifeste public ne correspond pas au descripteur chiffré de l'archive."

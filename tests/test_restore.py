@@ -20,6 +20,7 @@ from ohana_installer.commands.restore import (
 )
 from ohana_installer.icloud import TemporaryICloudSession
 from ohana_installer.restore import (
+    REQUIRED_PAYLOAD_ROOTS,
     RestoreError,
     _safe_member_path,
     _verify_and_remove_descriptor,
@@ -159,7 +160,13 @@ def test_restore_accepts_only_managed_configuration_member() -> None:
     assert str(_safe_member_path(member)) == "etc/ohana-agent/plugins/backup.yaml"
 
 
-def test_encrypted_descriptor_must_match_public_manifest(tmp_path: Path) -> None:
+@pytest.mark.parametrize("with_contents", (False, True))
+@pytest.mark.parametrize(
+    "mismatch", (None, "backup_id", "created_at", "agent_version", "unexpected")
+)
+def test_encrypted_descriptor_must_match_public_manifest(
+    tmp_path: Path, with_contents: bool, mismatch: str | None
+) -> None:
     manifest = parse_restore_manifest(_manifest())
     descriptor = tmp_path / "ohana-backup/descriptor.json"
     descriptor.parent.mkdir(parents=True)
@@ -178,9 +185,59 @@ def test_encrypted_descriptor_must_match_public_manifest(tmp_path: Path) -> None
         encoding="utf-8",
     )
 
+    if with_contents:
+        payload = json.loads(descriptor.read_text(encoding="utf-8"))
+        payload["contents"] = [str(root) for root in REQUIRED_PAYLOAD_ROOTS]
+        descriptor.write_text(json.dumps(payload), encoding="utf-8")
+        for root in REQUIRED_PAYLOAD_ROOTS:
+            path = tmp_path.joinpath(*root.parts)
+            if root.suffix:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(b"payload")
+            else:
+                path.mkdir(parents=True, exist_ok=True)
+
+    if mismatch is not None:
+        payload = json.loads(descriptor.read_text(encoding="utf-8"))
+        payload[mismatch] = "mismatch"
+        descriptor.write_text(json.dumps(payload), encoding="utf-8")
+        with pytest.raises(RestoreError, match="ne correspond pas"):
+            _verify_and_remove_descriptor(tmp_path, manifest)
+        assert descriptor.exists()
+        return
+
     _verify_and_remove_descriptor(tmp_path, manifest)
 
     assert not descriptor.exists()
+
+
+@pytest.mark.parametrize(
+    "contents",
+    (None, "etc/ohana-agent", [], ["../../etc/shadow"], [1]),
+)
+def test_descriptor_rejects_invalid_contents(tmp_path: Path, contents: object) -> None:
+    manifest = parse_restore_manifest(_manifest())
+    descriptor = tmp_path / "ohana-backup/descriptor.json"
+    descriptor.parent.mkdir(parents=True)
+    descriptor.write_text(json.dumps({"contents": contents}), encoding="utf-8")
+
+    with pytest.raises(RestoreError, match="inventaire"):
+        _verify_and_remove_descriptor(tmp_path, manifest)
+    assert descriptor.exists()
+
+
+def test_descriptor_rejects_missing_declared_payload(tmp_path: Path) -> None:
+    manifest = parse_restore_manifest(_manifest())
+    descriptor = tmp_path / "ohana-backup/descriptor.json"
+    descriptor.parent.mkdir(parents=True)
+    descriptor.write_text(
+        json.dumps({"contents": [str(root) for root in REQUIRED_PAYLOAD_ROOTS]}),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(RestoreError, match="absent de l'archive"):
+        _verify_and_remove_descriptor(tmp_path, manifest)
+    assert descriptor.exists()
 
 
 def test_encrypted_descriptor_rejects_manifest_archive_mismatch(tmp_path: Path) -> None:

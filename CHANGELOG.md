@@ -8,6 +8,15 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.3] — Restauration INFRA-01 — 2026-10-09
+
+- Correction du refus des descripteurs chiffrés contenant `contents` : inventaire
+  et présence des éléments validés séparément des métadonnées du manifeste.
+  Les anciens descripteurs restent compatibles, les incohérences restent refusées.
+- Guides actualisés : Trixie, identité age récupérée automatiquement sur iCloud,
+  remplacement de la carte SD et bascule DHCP.
+
+
 # [1.15.2] — Copie iCloud non bloquante — 2026-09-28
 
 - Mise à jour : une copie de récupération iCloud impossible ne bloque plus le

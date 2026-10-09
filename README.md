@@ -43,7 +43,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.8.0** fournit une interface interactive et huit commandes explicites :
+La version **1.15.3** fournit une interface interactive et huit commandes explicites :
 
 ```text
 ohana
@@ -140,8 +140,11 @@ Installer peut également retrouver la sauvegarde la plus récente dans iCloud :
 
 ```bash
 sudo ohana restore \
-  --icloud
+  --icloud --choose-backup
 ```
+
+À partir de 1.15.3, le champ `contents` du descripteur est validé séparément
+des métadonnées ; les anciens descripteurs restent compatibles.
 
 Installer récupère automatiquement dans iCloud l'identité `age` associée à la
 sauvegarde, puis demande l'identifiant Apple, le mot de passe et, si nécessaire,
@@ -397,7 +400,7 @@ nécessite donc aucune nouvelle version de l'Installer.
 
 # Compatibilité
 
-La version 1.8.0 cible les environnements Linux utilisant **systemd**. Les
+La version 1.15.3 cible les environnements Linux utilisant **systemd**. Les
 unités créent aussi les répertoires d'état persistants d'Agent et Vision sous
 `/var/lib`, avec un accès limité au compte de service.
 
@@ -411,7 +414,7 @@ La composition recommandée validée par `config/release-manifest.yaml` est :
 * Ohana-Vision 1.10.0.
 
 `config/release-catalog.yaml` contient toutes les compositions officiellement
-sélectionnables par Installer 1.8.0.
+sélectionnables par Installer.
 
 Elle déploie les configurations Agent pour DNS, NTP, MQTT, présence réseau,
 DHCP, WireGuard, Télémétrie Home Assistant et Z-Wave. Le manifeste détermine également
