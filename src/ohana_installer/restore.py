@@ -33,6 +33,13 @@ ALLOWED_ARCHIVE_ROOTS = (
 )
 DESCRIPTOR_PATH = PurePosixPath("ohana-backup/descriptor.json")
 REQUIRED_PAYLOAD_ROOTS = ALLOWED_ARCHIVE_ROOTS[:-1]
+PAYLOAD_DIRECTORY_ROOTS = frozenset(
+    {
+        PurePosixPath("etc/ohana-agent"),
+        PurePosixPath("etc/ohana-vision"),
+        PurePosixPath("etc/dnsmasq.d"),
+    }
+)
 SERVICE_ORDER = (
     "ohana-agent.service",
     "ohana-vision.service",
@@ -335,7 +342,7 @@ def _verify_and_remove_descriptor(
             raise RestoreError("L'inventaire du descripteur chiffré est invalide.")
         for root in REQUIRED_PAYLOAD_ROOTS:
             path = extracted.joinpath(*root.parts)
-            present = path.is_file() if root.suffix else path.is_dir()
+            present = path.is_dir() if root in PAYLOAD_DIRECTORY_ROOTS else path.is_file()
             if not present:
                 raise RestoreError(f"Élément déclaré absent de l'archive : {root}.")
     if descriptor != expected:

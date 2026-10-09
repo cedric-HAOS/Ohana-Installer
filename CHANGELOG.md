@@ -8,6 +8,13 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.4] — Type du répertoire DHCP restauré — 2026-10-09
+
+- Correction du contrôle de présence de `etc/dnsmasq.d`, désormais explicitement
+  reconnu comme un dossier. Le suffixe `.d` ne doit pas être interprété comme
+  une extension de fichier. Test de restauration avec les vrais types du contrat.
+
+
 # [1.15.3] — Restauration INFRA-01 — 2026-10-09
 
 - Correction du refus des descripteurs chiffrés contenant `contents` : inventaire

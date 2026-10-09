@@ -191,7 +191,7 @@ def test_encrypted_descriptor_must_match_public_manifest(
         descriptor.write_text(json.dumps(payload), encoding="utf-8")
         for root in REQUIRED_PAYLOAD_ROOTS:
             path = tmp_path.joinpath(*root.parts)
-            if root.suffix:
+            if str(root) in {"etc/chrony/chrony.conf", "var/lib/ohana-vision/vision.db"}:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(b"payload")
             else:
