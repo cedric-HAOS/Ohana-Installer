@@ -568,7 +568,9 @@ def _service_is_active(command_runner: CommandRunner, service: str) -> bool:
 
 
 def _restore_owner(path: Path) -> None:
-    if path.is_relative_to(Path("/etc/ohana-agent")):
+    if path == Path("/etc/ohana-agent/rclone.conf"):
+        user = group = "ohana-agent"
+    elif path.is_relative_to(Path("/etc/ohana-agent")):
         user, group = "root", "ohana-agent"
     elif path.is_relative_to(Path("/etc/ohana-vision")):
         user, group = "root", "ohana-vision"
@@ -582,6 +584,8 @@ def _restore_owner(path: Path) -> None:
         user = group = "root"
     try:
         shutil.chown(path, user=user, group=group)
+        if path == Path("/etc/ohana-agent/rclone.conf"):
+            path.chmod(0o600)
         if (
             (path.parent == Path("/etc/dnsmasq.d") and path.name in DNSMASQ_MANAGED_FILES)
             or path

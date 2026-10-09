@@ -8,6 +8,11 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.6] — Permissions iCloud restaurées — 2026-10-09
+
+- Restauration : `rclone.conf` appartient à `ohana-agent` en mode `600`, afin que
+  le service puisse lire et renouveler la session iCloud sans élargir l'accès.
+
 # [1.15.5] — Restauration et autorisations — 2026-10-09
 
 - Restauration : contrôle SQLite avant application, sauvegarde et retrait des

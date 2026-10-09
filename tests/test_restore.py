@@ -603,3 +603,19 @@ def test_restore_owner_reconciles_dhcp_permissions(monkeypatch):
     _restore_owner(path)
     assert ownership == [(path, {"user": "root", "group": "ohana-agent"})]
     assert modes == [(path, 0o660)]
+
+
+def test_restore_owner_keeps_rclone_private_and_agent_writable(monkeypatch):
+    from ohana_installer.restore import _restore_owner
+
+    ownership = []
+    modes = []
+    monkeypatch.setattr(
+        "ohana_installer.restore.shutil.chown",
+        lambda path, **kwargs: ownership.append((path, kwargs)),
+    )
+    monkeypatch.setattr(Path, "chmod", lambda path, mode: modes.append((path, mode)))
+    path = Path("/etc/ohana-agent/rclone.conf")
+    _restore_owner(path)
+    assert ownership == [(path, {"user": "ohana-agent", "group": "ohana-agent"})]
+    assert modes == [(path, 0o600)]
