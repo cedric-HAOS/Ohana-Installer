@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import io
 import json
+import sqlite3
 import subprocess
 import tarfile
 from dataclasses import replace
@@ -77,6 +78,45 @@ def _manifest() -> bytes:
             },
         }
     ).encode()
+
+
+@pytest.mark.parametrize("break_on_close", (False, True))
+@pytest.mark.parametrize("stderr", (b"age: no identity matched any of the recipients", b""))
+def test_decrypt_reports_age_error_after_broken_pipe(
+    tmp_path: Path, break_on_close: bool, stderr: bytes
+) -> None:
+    class BrokenInput:
+        def write(self, _chunk):
+            if not break_on_close:
+                raise BrokenPipeError("pipe closed")
+
+        def close(self):
+            raise BrokenPipeError("pipe closed")
+
+    class FailedAgeProcess:
+        stdin = BrokenInput()
+        returncode = 1
+        collected = False
+
+        def communicate(self):
+            assert self.stdin is None
+            self.collected = True
+            return b"", stderr
+
+    process = FailedAgeProcess()
+    identity = tmp_path / "identity.agekey"
+    identity.write_text("test", encoding="utf-8")
+    expected = "no identity matched" if stderr else "interrompu"
+    with pytest.raises(RestoreError, match=expected) as failure:
+        decrypt_and_extract(
+            io.BytesIO(b"encrypted"),
+            manifest=parse_restore_manifest(_manifest()),
+            identity_path=identity,
+            staging_directory=tmp_path / "staging",
+            popen_factory=lambda *_args, **_kwargs: process,
+        )
+    assert isinstance(failure.value.__cause__, BrokenPipeError)
+    assert process.collected
 
 
 def test_parse_restore_manifest_accepts_supported_contract() -> None:
@@ -503,3 +543,63 @@ def test_configuration_restore_rolls_back_on_validation_failure(tmp_path: Path) 
         "start",
         "ohana-agent.service",
     ) in commands
+
+
+@pytest.mark.parametrize("validation_fails", (False, True))
+def test_database_restore_removes_stale_sidecars_and_rolls_back(tmp_path, validation_fails):
+    payload = tmp_path / "payload"
+    source = payload / "var/lib/ohana-vision/vision.db"
+    source.parent.mkdir(parents=True)
+    with sqlite3.connect(source) as connection:
+        connection.execute("CREATE TABLE proof(value TEXT)")
+        connection.execute("INSERT INTO proof VALUES ('restored')")
+    machine = tmp_path / "machine"
+    target = machine / "var/lib/ohana-vision/vision.db"
+    target.parent.mkdir(parents=True)
+    target.write_bytes(b"old database")
+    for suffix in ("-wal", "-shm"):
+        target.with_name(target.name + suffix).write_bytes(b"old sidecar")
+
+    def runner(command, **_kwargs):
+        if command[1] == "is-active":
+            return subprocess.CompletedProcess(command, 3, "inactive", "")
+        if command[:2] == ("/usr/sbin/dnsmasq", "--test") and validation_fails:
+            return subprocess.CompletedProcess(command, 1, "", "invalid")
+        if command[1:3] == ("enable", "--now"):
+            assert not target.with_name(target.name + "-wal").exists()
+            assert not target.with_name(target.name + "-shm").exists()
+        return subprocess.CompletedProcess(command, 0, "", "")
+
+    if validation_fails:
+        with pytest.raises(RestoreError):
+            apply_staged_configuration(
+                payload,
+                command_runner=runner,
+                destination_root=machine,
+                owner_restorer=lambda _p: None,
+            )
+        assert target.read_bytes() == b"old database"
+        for suffix in ("-wal", "-shm"):
+            assert target.with_name(target.name + suffix).read_bytes() == b"old sidecar"
+    else:
+        apply_staged_configuration(
+            payload, command_runner=runner, destination_root=machine, owner_restorer=lambda _p: None
+        )
+        with sqlite3.connect(target) as connection:
+            assert connection.execute("SELECT value FROM proof").fetchall() == [("restored",)]
+
+
+def test_restore_owner_reconciles_dhcp_permissions(monkeypatch):
+    from ohana_installer.restore import _restore_owner
+
+    ownership = []
+    modes = []
+    monkeypatch.setattr(
+        "ohana_installer.restore.shutil.chown",
+        lambda path, **kwargs: ownership.append((path, kwargs)),
+    )
+    monkeypatch.setattr(Path, "chmod", lambda path, mode: modes.append((path, mode)))
+    path = Path("/etc/dnsmasq.d/00-ohana.conf")
+    _restore_owner(path)
+    assert ownership == [(path, {"user": "root", "group": "ohana-agent"})]
+    assert modes == [(path, 0o660)]

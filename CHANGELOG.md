@@ -8,6 +8,21 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+# [1.15.5] — Restauration et autorisations — 2026-10-09
+
+- Restauration : contrôle SQLite avant application, sauvegarde et retrait des
+  fichiers WAL/SHM résiduels, avec remise en place lors d'un retour arrière.
+- Réconciliation des permissions DHCP et des configurations administrables
+  après application des fichiers sauvegardés.
+- Import optionnel des autorisations durables Katsuyu/Shizune exportées par Agent,
+  dans des copies des bases installées, sans restauration des anciens jobs.
+- Une restauration iCloud récupère sa clé cloud sauf si `--identity` est explicite,
+  même si une installation neuve a déjà créé une identité locale.
+
+- Restauration : une rupture du flux vers age affiche maintenant son diagnostic
+  de déchiffrement, au lieu du seul `Broken pipe`. Le flux est fermé avant de
+  collecter l'erreur du processus, y compris lorsque la fermeture échoue.
+
 # [1.15.4] — Type du répertoire DHCP restauré — 2026-10-09
 
 - Correction du contrôle de présence de `etc/dnsmasq.d`, désormais explicitement

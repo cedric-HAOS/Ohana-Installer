@@ -6,13 +6,20 @@ import hashlib
 import json
 import os
 import shutil
+import sqlite3
 import subprocess
 import tarfile
 from collections.abc import Callable, Sequence
+from contextlib import closing, suppress
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
 
+from ohana_installer.administration import (
+    AGENT_PLUGIN_CONFIGURATION_FILENAMES,
+    DNSMASQ_MANAGED_FILES,
+)
+from ohana_installer.restore_authorizations import stage_authorizations
 from ohana_installer.restore_manifest import (
     BACKUP_ID_PATTERN,
     RestoreManifest,
@@ -277,8 +284,20 @@ def decrypt_and_extract(
         process.stdin.close()
         process.stdin = None
         _stdout, stderr = process.communicate()
+    except BrokenPipeError as error:
+        if process.stdin is not None:
+            with suppress(OSError):
+                process.stdin.close()
+            process.stdin = None
+        _stdout, stderr = process.communicate()
+        detail = (stderr or b"flux de dechiffrement interrompu").decode(errors="replace").strip()
+        raise RestoreError(f"Déchiffrement age impossible : {detail}") from error
     except Exception:
         process.kill()
+        if process.stdin is not None:
+            with suppress(OSError):
+                process.stdin.close()
+            process.stdin = None
         process.communicate()
         raise
     if process.returncode != 0:
@@ -303,7 +322,22 @@ def decrypt_and_extract(
     finally:
         decrypted_tar.unlink(missing_ok=True)
     _verify_and_remove_descriptor(extracted, manifest)
+    database = extracted / "var/lib/ohana-vision/vision.db"
+    if database.is_file():
+        _validate_database(database)
     return tuple(members)
+
+
+def _validate_database(path: Path) -> None:
+    try:
+        with closing(
+            sqlite3.connect(path.resolve().as_uri() + "?mode=ro&immutable=1", uri=True)
+        ) as connection:
+            result = connection.execute("PRAGMA integrity_check").fetchall()
+        if result != [("ok",)]:
+            raise RestoreError(f"Base SQLite de sauvegarde invalide : {path.name}.")
+    except sqlite3.Error as error:
+        raise RestoreError(f"Base SQLite de sauvegarde invalide : {path.name} : {error}") from error
 
 
 def _verify_and_remove_descriptor(
@@ -407,20 +441,47 @@ def apply_staged_configuration(
     previously_active = tuple(
         service for service in SERVICE_ORDER if _service_is_active(command_runner, service)
     )
-    _systemctl(command_runner, "stop", *SERVICE_ORDER, check=False)
+    _systemctl(command_runner, "stop", *SERVICE_ORDER)
     rollback_directory = payload_directory.parent / "rollback"
     rollback_files: list[_RollbackFile] = []
     try:
-        for source in sorted(payload_directory.rglob("*")):
-            if not source.is_file():
-                continue
-            relative = PurePosixPath(source.relative_to(payload_directory).as_posix())
-            if not any(
-                relative == root or relative.is_relative_to(root) for root in ALLOWED_ARCHIVE_ROOTS
+        try:
+            generated = stage_authorizations(payload_directory, destination_root)
+        except (ValueError, sqlite3.Error) as error:
+            raise RestoreError(f"Autorisations de sauvegarde invalides : {error}") from error
+        generated_paths = {relative.as_posix() for _source, relative in generated}
+        sources = [
+            (source, source.relative_to(payload_directory))
+            for source in sorted(payload_directory.rglob("*"))
+            if source.is_file()
+        ]
+        sources.extend(generated)
+        for source, source_relative in sources:
+            relative = PurePosixPath(source_relative.as_posix())
+            if (
+                not any(
+                    relative == root or relative.is_relative_to(root)
+                    for root in ALLOWED_ARCHIVE_ROOTS
+                )
+                and relative.as_posix() not in generated_paths
             ):
                 raise RestoreError(f"Fichier restauré hors périmètre : {relative}.")
             destination = destination_root.joinpath(*relative.parts)
             destination.parent.mkdir(parents=True, exist_ok=True)
+            if (
+                relative.as_posix() == "var/lib/ohana-vision/vision.db"
+                or relative.as_posix() in generated_paths
+            ):
+                _validate_database(source)
+                for suffix in ("-wal", "-shm"):
+                    sidecar = destination.with_name(destination.name + suffix)
+                    if sidecar.exists():
+                        rollback_files.append(
+                            _capture_rollback(
+                                sidecar, PurePosixPath(str(relative) + suffix), rollback_directory
+                            )
+                        )
+                        sidecar.unlink()
             rollback_files.append(_capture_rollback(destination, relative, rollback_directory))
             _atomic_restore_file(source, destination, owner_restorer=owner_restorer)
 
@@ -435,7 +496,13 @@ def apply_staged_configuration(
         )
         _systemctl(command_runner, "disable", "--now", "dnsmasq.service", check=False)
     except Exception:
+        _systemctl(command_runner, "stop", *SERVICE_ORDER, check=False)
         for rollback in reversed(rollback_files):
+            if rollback.destination.suffix == ".db":
+                for suffix in ("-wal", "-shm"):
+                    rollback.destination.with_name(rollback.destination.name + suffix).unlink(
+                        missing_ok=True
+                    )
             if rollback.backup is None:
                 rollback.destination.unlink(missing_ok=True)
                 continue
@@ -507,10 +574,27 @@ def _restore_owner(path: Path) -> None:
         user, group = "root", "ohana-vision"
     elif path.is_relative_to(Path("/var/lib/ohana-vision")):
         user = group = "ohana-vision"
+    elif path.is_relative_to(Path("/var/lib/ohana-agent")):
+        user = group = "ohana-agent"
+    elif path.parent == Path("/etc/dnsmasq.d") and path.name in DNSMASQ_MANAGED_FILES:
+        user, group = "root", "ohana-agent"
     else:
         user = group = "root"
     try:
         shutil.chown(path, user=user, group=group)
+        if (
+            (path.parent == Path("/etc/dnsmasq.d") and path.name in DNSMASQ_MANAGED_FILES)
+            or path
+            in (
+                Path("/etc/ohana-agent/shikamaru.yaml"),
+                Path("/etc/ohana-agent/infrastructure.yaml"),
+            )
+            or (
+                path.parent == Path("/etc/ohana-agent/plugins")
+                and path.name in AGENT_PLUGIN_CONFIGURATION_FILENAMES
+            )
+        ):
+            path.chmod(0o660)
     except (LookupError, OSError) as error:
         raise RestoreError(f"Propriétaire impossible pour {path} : {error}") from error
 

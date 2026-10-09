@@ -247,7 +247,7 @@ def run(args: argparse.Namespace) -> int:
             ensure_age_installed()
             identity_path = args.identity
             recovered_identity = False
-            if identity_path is None and IDENTITY_PATH.is_file():
+            if identity_path is None and args.local is not None and IDENTITY_PATH.is_file():
                 identity_path = IDENTITY_PATH
             if identity_path is None and args.local is None:
                 assert rclone_config is not None
@@ -290,12 +290,19 @@ def run(args: argparse.Namespace) -> int:
                 if process.stdout is None:
                     process.kill()
                     raise RestoreError("rclone n'a pas ouvert le flux de sauvegarde.")
-                decrypt_and_extract(
-                    process.stdout,
-                    manifest=manifest,
-                    identity_path=identity_path,
-                    staging_directory=staging,
-                )
+                try:
+                    decrypt_and_extract(
+                        process.stdout,
+                        manifest=manifest,
+                        identity_path=identity_path,
+                        staging_directory=staging,
+                    )
+                except Exception:
+                    if process.poll() is None:
+                        process.kill()
+                    process.stdout.close()
+                    process.communicate()
+                    raise
                 _stdout, stderr = process.communicate()
                 if process.returncode != 0:
                     detail = (stderr or b"erreur inconnue").decode(errors="replace")

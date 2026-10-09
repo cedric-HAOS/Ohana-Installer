@@ -43,7 +43,7 @@ Ohana-Installer poursuit quatre objectifs principaux :
 
 # Fonctionnalités
 
-La version **1.15.4** fournit une interface interactive et huit commandes explicites :
+La version **1.15.5** fournit une interface interactive et huit commandes explicites :
 
 ```text
 ohana
@@ -143,7 +143,7 @@ sudo ohana restore \
   --icloud --choose-backup
 ```
 
-À partir de 1.15.4, le champ `contents` du descripteur est validé séparément
+À partir de 1.15.5, le champ `contents` du descripteur est validé séparément
 des métadonnées ; les anciens descripteurs restent compatibles.
 
 Installer récupère automatiquement dans iCloud l'identité `age` associée à la
@@ -400,7 +400,7 @@ nécessite donc aucune nouvelle version de l'Installer.
 
 # Compatibilité
 
-La version 1.15.4 cible les environnements Linux utilisant **systemd**. Les
+La version 1.15.5 cible les environnements Linux utilisant **systemd**. Les
 unités créent aussi les répertoires d'état persistants d'Agent et Vision sous
 `/var/lib`, avec un accès limité au compte de service.
 
