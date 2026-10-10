@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 
+from ohana_installer import adguard_sync
 from ohana_installer.manifest import InstallationProfile, SystemCapability
 
 CommandRunner = Callable[..., subprocess.CompletedProcess[str]]
@@ -68,6 +69,14 @@ class CapabilityStatus:
 
 
 KNOWN_CAPABILITIES = {
+    "adguard-sync": SystemCapability(
+        identifier="adguard-sync",
+        name="Synchronisation AdGuard",
+        implementation="adguardhome-sync",
+        package="adguardhome-sync",
+        service="adguardhome-sync.service",
+        activation="explicit",
+    ),
     "dhcp": SystemCapability(
         identifier="dhcp",
         name="Attribution des adresses IP",
@@ -87,6 +96,7 @@ KNOWN_CAPABILITIES = {
 }
 
 CONFIGURATION_PATHS = {
+    "adguard-sync": adguard_sync.CONFIGURATION,
     "dhcp": Path("/etc/dnsmasq.d/00-ohana.conf"),
     "time-reference": Path("/etc/chrony/chrony.conf"),
 }
@@ -171,15 +181,35 @@ def provision_profile(
     if profile is None:
         return ProfileProvisioningResult()
 
+    adguard = next(
+        (item for item in profile.capabilities if item.identifier == "adguard-sync"), None
+    )
+    if adguard is not None and (
+        adguard.implementation != "adguardhome-sync"
+        or adguard.package != "adguardhome-sync"
+        or adguard.service != adguard_sync.SERVICE
+        or adguard.activation != "explicit"
+    ):
+        raise CapabilityProvisioningError("Contrat de capacité AdGuard invalide.")
+    try:
+        adguard_created = (
+            adguard_sync.provision(command_runner=command_runner) if adguard else False
+        )
+    except adguard_sync.AdGuardInstallationError as error:
+        raise CapabilityProvisioningError(str(error)) from error
     created = {
-        capability.identifier: not package_is_installed(
+        capability.identifier: adguard_created
+        if capability.identifier == "adguard-sync"
+        else not package_is_installed(
             capability.package,
             command_runner=command_runner,
         )
         for capability in profile.capabilities
     }
     missing = tuple(
-        capability for capability in profile.capabilities if created[capability.identifier]
+        capability
+        for capability in profile.capabilities
+        if capability.identifier != "adguard-sync" and created[capability.identifier]
     )
     missing_utilities = tuple(
         utility
@@ -225,6 +255,8 @@ def provision_profile(
 
     for result in results:
         capability = result.capability
+        if capability.identifier == "adguard-sync":
+            continue
         if capability.activation == "explicit" and result.package_created:
             _systemctl(
                 "disable",
@@ -273,9 +305,13 @@ def profile_requires_provisioning(
                 for utility in profile.utilities
             )
             or any(
-                not package_is_installed(
-                    capability.package,
-                    command_runner=command_runner,
+                (
+                    adguard_sync.needs_provisioning()
+                    if capability.identifier == "adguard-sync"
+                    else not package_is_installed(
+                        capability.package,
+                        command_runner=command_runner,
+                    )
                 )
                 for capability in profile.capabilities
             )
@@ -329,14 +365,22 @@ def capability_status(
 ) -> CapabilityStatus:
     """Lire l'état installé, configuré et actif d'une capacité."""
 
-    installed = package_is_installed(capability.package, command_runner=command_runner)
+    installed = (
+        adguard_sync.installed_version() is not None
+        if capability.identifier == "adguard-sync"
+        else package_is_installed(capability.package, command_runner=command_runner)
+    )
     configuration_path = CONFIGURATION_PATHS.get(capability.identifier)
-    configured = bool(configuration_path and configuration_path.is_file())
+    configured = (
+        adguard_sync.configuration_ready()
+        if capability.identifier == "adguard-sync"
+        else bool(configuration_path and configuration_path.is_file())
+    )
     active = False
     if installed:
         completed = _systemctl(
             "is-active",
-            capability.service,
+            adguard_sync.TIMER if capability.identifier == "adguard-sync" else capability.service,
             command_runner=command_runner,
             check=False,
         )
@@ -385,6 +429,11 @@ def activate_capability(
         capability = KNOWN_CAPABILITIES[identifier]
     except KeyError as error:
         raise CapabilityProvisioningError(f"Capacité inconnue : {identifier}.") from error
+    if identifier == "adguard-sync":
+        if not adguard_sync.HELPER.is_file():
+            raise CapabilityProvisioningError("Mettre à jour Agent pour activer AdGuard.")
+        _run((str(adguard_sync.HELPER), "activate"), command_runner=command_runner)
+        return
     if not package_is_installed(capability.package, command_runner=command_runner):
         raise CapabilityProvisioningError(f"La capacité {capability.name} n'est pas installée.")
     configuration_path = CONFIGURATION_PATHS.get(identifier)
@@ -413,6 +462,9 @@ def deactivate_capability(
         capability = KNOWN_CAPABILITIES[identifier]
     except KeyError as error:
         raise CapabilityProvisioningError(f"Capacité inconnue : {identifier}.") from error
+    if identifier == "adguard-sync":
+        _run((str(adguard_sync.HELPER), "deactivate"), command_runner=command_runner)
+        return
     _systemctl(
         "disable",
         "--now",

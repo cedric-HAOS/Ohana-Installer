@@ -510,3 +510,10 @@ est absent. La migration est idempotente, réutilise les certificats Katsuyu et
 ne remplace aucune section `administration.companion` déjà configurée. Les
 identifiants APNs ne sont jamais inventés : l’envoi natif reste désactivé tant
 que la clé Apple et ses identifiants ne sont pas fournis explicitement.
+
+## Synchronisation AdGuard
+
+Installer 1.16.0 prépare la capacité `adguard-sync` du profil INFRA-01 : moteur
+0.9.4 vérifié, unités systemd et permissions. Configuration et activation dans
+Vision 1.38.0 avec Agent 1.47.0 ; restauration du choix sauvegardé après validation.
+Voir [le guide de la capacité](docs/AdGuard-Sync.md).

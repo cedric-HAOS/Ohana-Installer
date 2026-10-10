@@ -38,6 +38,7 @@ AGENT_WORKER_CERTIFICATE_PATH = AGENT_WORKER_TLS_DIRECTORY / "worker.crt"
 AGENT_WORKER_PRIVATE_KEY_PATH = AGENT_WORKER_TLS_DIRECTORY / "worker.key"
 OPENSSL_PATH = Path("/usr/bin/openssl")
 AGENT_PLUGIN_CONFIGURATION_FILENAMES = (
+    "adguard-sync.yaml",
     "dns.yaml",
     "ntp.yaml",
     "mqtt.yaml",
@@ -296,6 +297,10 @@ def prepare_administration(
             systemd_directory,
             purge_stale_leases=dhcp_lease_purge_supported,
         )
+
+    from ohana_installer.adguard_sync import prepare_administration as prepare_adguard
+
+    prepare_adguard(secure_ownership=secure_ownership)
 
     chrony_restart_enabled = supports_chrony_restart(agent_version) and chronyd_executable.is_file()
 

@@ -34,7 +34,7 @@ def configure_parser(subparsers: argparse._SubParsersAction) -> None:
         )
         action_parser.add_argument(
             "identifier",
-            choices=("dhcp", "time-reference"),
+            choices=("dhcp", "time-reference", "adguard-sync"),
             help="Identifiant de la capacité.",
         )
         action_parser.add_argument(

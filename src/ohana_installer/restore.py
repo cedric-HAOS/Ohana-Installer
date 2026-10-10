@@ -15,6 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from typing import Any, BinaryIO
 
+from ohana_installer import adguard_sync
 from ohana_installer.administration import (
     AGENT_PLUGIN_CONFIGURATION_FILENAMES,
     DNSMASQ_MANAGED_FILES,
@@ -438,13 +439,48 @@ def apply_staged_configuration(
 ) -> None:
     """Arrêter les services, appliquer les fichiers puis valider sans activer DHCP."""
 
-    previously_active = tuple(
-        service for service in SERVICE_ORDER if _service_is_active(command_runner, service)
+    sync_configuration = payload_directory / "etc/ohana-agent/adguardhome-sync.yaml"
+    sync_state = payload_directory / "etc/ohana-agent/adguard-sync-state.json"
+    sync_present = sync_configuration.is_file()
+    sync_enabled = False
+    if sync_state.is_file():
+        try:
+            state = json.loads(sync_state.read_text(encoding="utf-8"))
+            if (
+                not isinstance(state, dict)
+                or state.get("schema_version") != 1
+                or not isinstance(state.get("enabled"), bool)
+            ):
+                raise ValueError()
+            sync_enabled = state["enabled"]
+        except (OSError, ValueError) as error:
+            raise RestoreError("État de synchronisation AdGuard sauvegardé invalide.") from error
+        if not sync_present:
+            raise RestoreError("Configuration AdGuard absente de la sauvegarde.")
+    if sync_present:
+        try:
+            adguard_sync.provision(command_runner=command_runner)
+        except adguard_sync.AdGuardInstallationError as error:
+            raise RestoreError(str(error)) from error
+    service_order = (
+        (*SERVICE_ORDER, adguard_sync.TIMER, adguard_sync.SERVICE)
+        if sync_present
+        else SERVICE_ORDER
     )
-    _systemctl(command_runner, "stop", *SERVICE_ORDER)
+    previous_sync_enabled = sync_present and _service_is_enabled(command_runner, adguard_sync.TIMER)
+    previously_active = tuple(
+        service for service in service_order if _service_is_active(command_runner, service)
+    )
+    _systemctl(command_runner, "stop", *service_order)
     rollback_directory = payload_directory.parent / "rollback"
     rollback_files: list[_RollbackFile] = []
     try:
+        if sync_present and not sync_state.is_file():
+            # Persist the inactive policy for old backups, including future backups.
+            sync_state.write_text(
+                json.dumps({"schema_version": 1, "enabled": False}), encoding="utf-8"
+            )
+            sync_state.chmod(0o640)
         try:
             generated = stage_authorizations(payload_directory, destination_root)
         except (ValueError, sqlite3.Error) as error:
@@ -495,8 +531,22 @@ def apply_staged_configuration(
             "ohana-vision.service",
         )
         _systemctl(command_runner, "disable", "--now", "dnsmasq.service", check=False)
+        if sync_present:
+            if sync_enabled:
+                if not adguard_sync.HELPER.is_file():
+                    raise RestoreError("Agent ne fournit pas l'activation AdGuard restaurée.")
+                completed = command_runner(
+                    (str(adguard_sync.HELPER), "activate"),
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if completed.returncode:
+                    raise RestoreError("Accès AdGuard restaurés non validés ; activation refusée.")
+            else:
+                _systemctl(command_runner, "disable", "--now", adguard_sync.TIMER)
     except Exception:
-        _systemctl(command_runner, "stop", *SERVICE_ORDER, check=False)
+        _systemctl(command_runner, "stop", *service_order, check=False)
         for rollback in reversed(rollback_files):
             if rollback.destination.suffix == ".db":
                 for suffix in ("-wal", "-shm"):
@@ -516,6 +566,13 @@ def apply_staged_configuration(
             chown = getattr(os, "chown", None)
             if chown is not None and rollback.uid is not None and rollback.gid is not None:
                 chown(rollback.destination, rollback.uid, rollback.gid)
+        if sync_present:
+            _systemctl(
+                command_runner,
+                "enable" if previous_sync_enabled else "disable",
+                adguard_sync.TIMER,
+                check=False,
+            )
         if previously_active:
             _systemctl(command_runner, "start", *previously_active, check=False)
         raise
@@ -557,6 +614,16 @@ def _atomic_restore_file(
         temporary.unlink(missing_ok=True)
 
 
+def _service_is_enabled(command_runner: CommandRunner, service: str) -> bool:
+    result = command_runner(
+        ("/usr/bin/systemctl", "is-enabled", service),
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    return result.returncode == 0 and result.stdout.strip() == "enabled"
+
+
 def _service_is_active(command_runner: CommandRunner, service: str) -> bool:
     result = command_runner(
         ("/usr/bin/systemctl", "is-active", service),
@@ -592,6 +659,7 @@ def _restore_owner(path: Path) -> None:
             in (
                 Path("/etc/ohana-agent/shikamaru.yaml"),
                 Path("/etc/ohana-agent/infrastructure.yaml"),
+                Path("/etc/ohana-agent/adguardhome-sync.yaml"),
             )
             or (
                 path.parent == Path("/etc/ohana-agent/plugins")

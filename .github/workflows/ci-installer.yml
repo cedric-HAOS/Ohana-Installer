@@ -56,6 +56,24 @@ jobs:
       - name: pytest
         run: python -m pytest -q -ra
 
+      - name: Vérifier le moteur AdGuard épinglé sur Linux
+        run: |
+          python - <<'PY'
+          import subprocess
+          import tempfile
+          from pathlib import Path
+          from ohana_installer.adguard_sync import ensure_binary, installed_version, VERSION
+          with tempfile.TemporaryDirectory(prefix="ohana-adguard-smoke-") as directory:
+              binary = Path(directory) / "adguardhome-sync"
+              ensure_binary(binary)
+              assert installed_version(binary) == VERSION
+              result = subprocess.run([str(binary), "run", "--help"],
+                                      capture_output=True, text=True, timeout=10, check=True)
+              for option in ("--cron", "--api-port", "--runOnStart"):
+                  assert option in result.stdout, option
+          print("Pinned engine and systemd command options verified")
+          PY
+
   commits:
     name: Messages de commit
     uses: cedric-HAOS/Ohana-Platform/.github/workflows/commit-messages.yml@main
