@@ -424,7 +424,7 @@ def test_repository_manifest_is_valid() -> None:
     manifest = load_manifest(manifest_path)
 
     assert manifest.platform_name == "Ohana"
-    assert manifest.platform_version == "1.0.141"
+    assert manifest.platform_version == "1.0.143"
     assert manifest.runtime.minimum_python_version == "3.13"
     assert {component.identifier for component in manifest.components} == {
         "agent",
@@ -446,9 +446,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.45.1"
-    assert agent.release_tag == "v1.45.1"
-    assert agent.package.filename == ("ohana_agent-1.45.1-py3-none-any.whl")
+    assert agent.version == "1.46.1"
+    assert agent.release_tag == "v1.46.1"
+    assert agent.package.filename == ("ohana_agent-1.46.1-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
@@ -460,6 +460,7 @@ def test_repository_manifest_is_valid() -> None:
         ("shikamaru.example.yaml", "shikamaru.yaml"),
         ("infrastructure.example.yaml", "infrastructure.yaml"),
         ("dns.example.yaml", "plugins/dns.yaml"),
+        ("adguard-sync.example.yaml", "plugins/adguard-sync.yaml"),
         ("ntp.example.yaml", "plugins/ntp.yaml"),
         ("mqtt.example.yaml", "plugins/mqtt.yaml"),
         ("network.example.yaml", "plugins/network.yaml"),
@@ -477,6 +478,8 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/infrastructure.yaml",
         "--dns-config",
         "/etc/ohana-agent/plugins/dns.yaml",
+        "--adguard-sync-config",
+        "/etc/ohana-agent/plugins/adguard-sync.yaml",
         "--ntp-config",
         "/etc/ohana-agent/plugins/ntp.yaml",
         "--mqtt-config",
@@ -497,9 +500,9 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/zwave.yaml",
     )
 
-    assert vision.version == "1.36.0"
-    assert vision.release_tag == "v1.36.0"
-    assert vision.package.filename == ("ohana_vision-1.36.0-py3-none-any.whl")
+    assert vision.version == "1.37.0"
+    assert vision.release_tag == "v1.37.0"
+    assert vision.package.filename == ("ohana_vision-1.37.0-py3-none-any.whl")
     assert vision.configuration is not None
     assert vision.service is not None
     assert vision.service.user == "ohana-vision"

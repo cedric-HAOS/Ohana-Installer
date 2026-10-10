@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.141"
+  version: "1.0.143"
 
 runtime:
   python:
@@ -32,12 +32,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.45.1"
-    release_tag: v1.45.1
+    version: "1.46.1"
+    release_tag: v1.46.1
 
     package:
       type: wheel
-      filename: ohana_agent-1.45.1-py3-none-any.whl
+      filename: ohana_agent-1.46.1-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent
@@ -50,6 +50,9 @@ components:
 
         - source: dns.example.yaml
           destination: plugins/dns.yaml
+
+        - source: adguard-sync.example.yaml
+          destination: plugins/adguard-sync.yaml
 
         - source: ntp.example.yaml
           destination: plugins/ntp.yaml
@@ -92,6 +95,8 @@ components:
         - /etc/ohana-agent/infrastructure.yaml
         - --dns-config
         - /etc/ohana-agent/plugins/dns.yaml
+        - --adguard-sync-config
+        - /etc/ohana-agent/plugins/adguard-sync.yaml
         - --ntp-config
         - /etc/ohana-agent/plugins/ntp.yaml
         - --mqtt-config
@@ -114,12 +119,12 @@ components:
   vision:
     name: Ohana-Vision
     repository: cedric-HAOS/Ohana-Vision
-    version: "1.36.0"
-    release_tag: v1.36.0
+    version: "1.37.0"
+    release_tag: v1.37.0
 
     package:
       type: wheel
-      filename: ohana_vision-1.36.0-py3-none-any.whl
+      filename: ohana_vision-1.37.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-vision

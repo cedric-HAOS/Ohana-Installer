@@ -8,6 +8,11 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Contrôle documentaire D05 : copies du manifeste et du catalogue synchronisées
+  avec Platform 1.0.143 ; attentes des tests actualisées, dont la configuration
+  et l'argument de lancement du plugin AdGuard. Les versions publiées restent
+  celles de la composition sélectionnée.
+
 # [1.15.6] — Permissions iCloud restaurées — 2026-10-09
 
 - Restauration : `rclone.conf` appartient à `ohana-agent` en mode `600`, afin que
