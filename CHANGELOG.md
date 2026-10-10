@@ -8,6 +8,10 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Copies de validation alignées sur Platform 1.0.145, Agent 1.48.0 et
+  Vision 1.38.1. Documentation de la surveillance AdGuard sans test DNS ;
+  Installer 1.16.0 reste compatible et ne nécessite pas de nouvelle release.
+
 - Contrôle documentaire D05 : copies du manifeste et du catalogue synchronisées
   avec Platform 1.0.143 ; attentes des tests actualisées, dont la configuration
   et l'argument de lancement du plugin AdGuard. Les versions publiées restent

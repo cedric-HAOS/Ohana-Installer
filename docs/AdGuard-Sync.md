@@ -30,7 +30,7 @@ sont distinctes : le moteur de synchronisation et sa surveillance.
 3. Choisir **Activer la synchronisation** et confirmer la copie de l’origine
    vers la réplique. Le timer est activé uniquement après validation des deux API.
 4. Activer la surveillance, appliquer ses paramètres et tester. Le plugin
-   contrôle ensuite le cycle, sa fraîcheur, les sections répliquées et les DNS.
+   contrôle ensuite le cycle, sa fraîcheur et les sections répliquées.
 
 Les mots de passe enregistrés ne sont jamais renvoyés à Vision. Un champ laissé
 vide conserve le secret existant. Les accès sont modifiables après arrêt du
