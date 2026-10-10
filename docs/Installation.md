@@ -1,6 +1,6 @@
 # Installation d'Ohana sur Raspberry Pi
 
-Ce guide installe **Ohana-Installer 1.15.6**, puis Ohana-Agent et Ohana-Vision
+Ce guide installe **Ohana-Installer 1.16.0**, puis Ohana-Agent et Ohana-Vision
 depuis leurs releases GitHub officielles.
 
 ## Configuration recommandée
@@ -47,15 +47,15 @@ sudo reboot
 ## 3. Télécharger la release officielle
 
 ```bash
-mkdir -p "$HOME/ohana-installer-1.15.6"
-cd "$HOME/ohana-installer-1.15.6"
+mkdir -p "$HOME/ohana-installer-1.16.0"
+cd "$HOME/ohana-installer-1.16.0"
 
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.15.6/ohana_installer-1.15.6-py3-none-any.whl
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.16.0/ohana_installer-1.16.0-py3-none-any.whl
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.15.6/ohana_installer-1.15.6.tar.gz
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.16.0/ohana_installer-1.16.0.tar.gz
 curl --fail --location --remote-name \
-  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.15.6/SHA256SUMS
+  https://github.com/cedric-HAOS/Ohana-Installer/releases/download/v1.16.0/SHA256SUMS
 ```
 
 ## 4. Vérifier les artefacts
@@ -75,7 +75,7 @@ Raspberry Pi OS.
 ```bash
 sudo python3.13 -m venv /opt/ohana-installer
 sudo /opt/ohana-installer/bin/python -m pip install \
-  ./ohana_installer-1.15.6-py3-none-any.whl
+  ./ohana_installer-1.16.0-py3-none-any.whl
 sudo ln -sfn /opt/ohana-installer/bin/ohana /usr/local/bin/ohana
 ```
 
@@ -88,7 +88,7 @@ ohana --version
 Résultat attendu :
 
 ```text
-ohana 1.15.6
+ohana 1.16.0
 ```
 
 ## 6. Ouvrir Ohana-Installer
@@ -300,7 +300,7 @@ installer Agent/Vision auparavant. Une installation partielle peut être reprise
 Choisir une sauvegarde antérieure à la panne. Installer récupère l’identité age
 sur iCloud, contrôle l’archive et réinstalle la composition sauvegardée.
 
-Les descripteurs avec `contents` sont acceptés depuis 1.15.6 : l’inventaire et les
+Les descripteurs avec `contents` sont acceptés depuis 1.16.0 : l’inventaire et les
 éléments déclarés sont vérifiés, puis les métadonnées sont comparées strictement.
 Les sauvegardes historiques sans ce champ restent compatibles.
 

@@ -13,6 +13,19 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
   et l'argument de lancement du plugin AdGuard. Les versions publiées restent
   celles de la composition sélectionnée.
 
+## [1.16.0] — 2026-10-10 — Capacité de synchronisation AdGuard
+
+- Capacité `adguard-sync` dans le profil INFRA-01 : moteur officiel 0.9.4 fixé
+  et vérifié par SHA-256 (amd64, arm64, armv7), service, timer et configuration.
+- Installation neuve inactive ; fichiers, unités personnalisées et choix
+  existants conservés. Administration via le helper Agent à privilèges limités.
+- Restauration : reconstruction du moteur même pour une ancienne sauvegarde,
+  réactivation d’un choix durable uniquement après validation des accès ; absence
+  de ce choix traitée comme inactive. Permissions de lecture et d’administration
+  des paramètres AdGuard rétablies ; retour arrière en cas d’échec.
+- Composition embarquée alignée sur Platform 1.0.144, Agent 1.47.0, Vision 1.38.0
+  et Shizune 0.5.0 ; minimum Agent 1.47.0 pour l’activation administrée.
+
 # [1.15.6] — Permissions iCloud restaurées — 2026-10-09
 
 - Restauration : `rclone.conf` appartient à `ohana-agent` en mode `600`, afin que
