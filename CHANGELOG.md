@@ -8,6 +8,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+## [1.17.0] — 2026-10-25 — `ohana restore` écrit un compte rendu JSON sans secret dans
+
 - `ohana restore` écrit un compte rendu JSON sans secret dans
   `/var/lib/ohana-installer/restore-reports` : résultat (`ok`, `partial` après
   l'installation, `failed` avant), étape atteinte, sauvegarde utilisée et détail
