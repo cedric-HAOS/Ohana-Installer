@@ -8,6 +8,12 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- `ohana restore` écrit un compte rendu JSON sans secret dans
+  `/var/lib/ohana-installer/restore-reports` : résultat (`ok`, `partial` après
+  l'installation, `failed` avant), étape atteinte, sauvegarde utilisée et détail
+  nettoyé. L'Agent 1.50.0 le lit pour tenir son registre des restaurations. Une
+  annulation ne laisse aucun compte rendu, et un échec d'écriture ne fait jamais
+  échouer la restauration.
 - Copies de validation alignées sur Platform 1.0.146, Agent 1.49.0 et
   Vision 1.39.0. Installer 1.16.0 reste compatible et ne nécessite pas de
   nouvelle release.

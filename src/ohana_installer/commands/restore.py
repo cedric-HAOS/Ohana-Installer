@@ -38,6 +38,11 @@ from ohana_installer.restore_manifest import (
     RestoreManifestError,
     parse_restore_manifest,
 )
+from ohana_installer.restore_report import (
+    RestoreProgress,
+    outcome_for_failure,
+    write_report,
+)
 
 RESTORE_ERROR = 3
 DEFAULT_REMOTE = "icloud:Ohana/Backups/infra-01"
@@ -185,6 +190,7 @@ def _select_icloud_manifest(
 def run(args: argparse.Namespace) -> int:
     """Exécuter une restauration locale ou iCloud."""
 
+    progress = RestoreProgress(mode="local" if args.local is not None else "icloud")
     try:
         RUNTIME_DIRECTORY.mkdir(parents=True, exist_ok=True)
         require_tmpfs(RUNTIME_DIRECTORY)
@@ -230,6 +236,8 @@ def run(args: argparse.Namespace) -> int:
                 manifest = parse_restore_manifest(manifest_bytes)
             if args.backup_id and manifest.backup_id != args.backup_id:
                 raise RestoreError("Le manifeste ne correspond pas au backup_id demandé.")
+            progress.backup_id = manifest.backup_id
+            progress.stage = "download"
             print(f"Sauvegarde INFRA-01 {manifest.backup_id}")
             print(f"Créée le        : {manifest.created_at}")
             platform = manifest.platform_version or "déduite du couple sauvegardé"
@@ -309,14 +317,19 @@ def run(args: argparse.Namespace) -> int:
                     raise RestoreError(f"Téléchargement iCloud interrompu : {detail[:500]}")
 
             print("✓ Archive déchiffrée, SHA-256 vérifié et contenu contrôlé.")
+            progress.stage = "install"
             install_platform(manifest)
+            progress.stage = "configuration"
             apply_staged_configuration(staging / "payload")
+            progress.stage = "identity"
             install_identity(identity_path)
             if recovered_identity:
                 print("✓ Identité age installée sur la nouvelle machine.")
             else:
                 print("✓ Identité age locale installée et validée.")
             print("✓ Configurations restaurées et services validés.")
+            progress.stage = "done"
+            write_report(progress, "ok", "Restauration terminée, services validés.")
             print("La capacité DHCP reste inactive par sécurité.")
             print("Activez-la avec : ohana capability activate dhcp")
             return 0
@@ -330,4 +343,5 @@ def run(args: argparse.Namespace) -> int:
         shutil.Error,
     ) as error:
         print(f"✗ Restauration impossible : {error}")
+        write_report(progress, outcome_for_failure(progress.stage), str(error))
         return RESTORE_ERROR
