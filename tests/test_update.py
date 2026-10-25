@@ -38,6 +38,14 @@ from ohana_installer.version import __version__
 _prepare_installer_update = update_command._prepare_installer_update
 
 
+def _newer(version: str) -> str:
+    major, minor, patch = (int(part) for part in version.split("."))
+    return f"{major}.{minor}.{patch + 1}"
+
+
+NEWER = _newer(__version__)
+
+
 @pytest.fixture(autouse=True)
 def _skip_installer_self_update(
     monkeypatch: pytest.MonkeyPatch,
@@ -217,7 +225,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    release = _installer_release("1.16.1")
+    release = _installer_release(NEWER)
     operations: list[str] = []
 
     monkeypatch.setattr(
@@ -253,7 +261,7 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
         "verify_component_command",
         lambda **kwargs: InstalledPythonComponent(
             name="Ohana-Installer",
-            version="1.16.1",
+            version=NEWER,
             environment_path=Path(sys.prefix),
             executable_path=Path(sys.prefix) / "bin" / "ohana",
         ),
@@ -266,12 +274,12 @@ def test_installer_self_update_downloads_upgrades_and_verifies(
 
     assert result == "updated"
     assert operations == [
-        "download:ohana_installer-1.16.1-py3-none-any.whl",
-        (f"upgrade:ohana_installer-1.16.1-py3-none-any.whl:{sys.executable}"),
+        f"download:ohana_installer-{NEWER}-py3-none-any.whl",
+        (f"upgrade:ohana_installer-{NEWER}-py3-none-any.whl:{sys.executable}"),
     ]
     output = capsys.readouterr().out
-    assert "1.16.1 téléchargé et vérifié" in output
-    assert "1.16.1 mis à jour" in output
+    assert f"{NEWER} téléchargé et vérifié" in output
+    assert f"{NEWER} mis à jour" in output
 
 
 def test_installer_self_update_can_be_declined(
@@ -281,7 +289,7 @@ def test_installer_self_update_can_be_declined(
     monkeypatch.setattr(
         update_command,
         "discover_latest_release",
-        lambda repository: _installer_release("1.16.1"),
+        lambda repository: _installer_release(NEWER),
     )
     monkeypatch.setattr(
         update_command,
@@ -311,7 +319,7 @@ def test_installer_self_update_requires_one_wheel(
         update_command,
         "discover_latest_release",
         lambda repository: _installer_release(
-            "1.16.1",
+            NEWER,
             include_wheel=False,
         ),
     )
