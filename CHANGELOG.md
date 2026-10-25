@@ -8,6 +8,10 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Copies de validation alignées sur Platform 1.0.146, Agent 1.49.0 et
+  Vision 1.39.0. Installer 1.16.0 reste compatible et ne nécessite pas de
+  nouvelle release.
+
 - Copies de validation alignées sur Platform 1.0.145, Agent 1.48.0 et
   Vision 1.38.1. Documentation de la surveillance AdGuard sans test DNS ;
   Installer 1.16.0 reste compatible et ne nécessite pas de nouvelle release.
