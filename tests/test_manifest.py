@@ -424,7 +424,7 @@ def test_repository_manifest_is_valid() -> None:
     manifest = load_manifest(manifest_path)
 
     assert manifest.platform_name == "Ohana"
-    assert manifest.platform_version == "1.0.152"
+    assert manifest.platform_version == "1.0.153"
     assert manifest.runtime.minimum_python_version == "3.13"
     assert {component.identifier for component in manifest.components} == {
         "agent",
@@ -447,9 +447,9 @@ def test_repository_manifest_is_valid() -> None:
         component for component in manifest.components if component.identifier == "vision"
     )
 
-    assert agent.version == "1.54.1"
-    assert agent.release_tag == "v1.54.1"
-    assert agent.package.filename == ("ohana_agent-1.54.1-py3-none-any.whl")
+    assert agent.version == "1.55.0"
+    assert agent.release_tag == "v1.55.0"
+    assert agent.package.filename == ("ohana_agent-1.55.0-py3-none-any.whl")
     assert agent.configuration is not None
     assert agent.service is not None
     assert agent.service.user == "ohana-agent"
@@ -501,9 +501,9 @@ def test_repository_manifest_is_valid() -> None:
         "/etc/ohana-agent/plugins/zwave.yaml",
     )
 
-    assert vision.version == "1.43.1"
-    assert vision.release_tag == "v1.43.1"
-    assert vision.package.filename == ("ohana_vision-1.43.1-py3-none-any.whl")
+    assert vision.version == "1.43.2"
+    assert vision.release_tag == "v1.43.2"
+    assert vision.package.filename == ("ohana_vision-1.43.2-py3-none-any.whl")
     assert vision.configuration is not None
     assert vision.service is not None
     assert vision.service.user == "ohana-vision"
