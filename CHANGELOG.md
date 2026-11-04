@@ -8,6 +8,9 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+- Assistants apt demandés depuis Vision (Agent 1.54.0 ou plus récent et `/usr/bin/apt-get` présent) : `ohana-system-refresh` (`apt-get update`) et `ohana-system-upgrade` (`apt-get -y --with-new-pkgs`, fichiers de configuration locaux conservés). Chaque service root a une commande fixe et sa propre unité de chemin sur `/run/ohana-agent/system-refresh.request` ou `system-upgrade.request` : le contenu d'une demande ne choisit ni l'action ni un argument. Aucun paquet n'est supprimé et la machine n'est jamais redémarrée.
+- `/etc/apt/apt.conf.d/20ohana-lists` active `APT::Periodic::Update-Package-Lists "1"` : les minuteurs `apt-daily` déjà présents rafraîchissent enfin les listes chaque jour (ils ne faisaient rien sans cette option). Aucune mise à jour automatique des paquets n'est configurée.
+
 ## [1.17.0] — 2026-10-25 — `ohana restore` écrit un compte rendu JSON sans secret dans
 
 - `ohana restore` écrit un compte rendu JSON sans secret dans

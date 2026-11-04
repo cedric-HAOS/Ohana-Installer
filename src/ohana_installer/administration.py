@@ -69,6 +69,15 @@ CHRONYD_EXECUTABLE = Path("/usr/sbin/chronyd")
 CHRONY_RESTART_SERVICE_NAME = "ohana-chrony-restart.service"
 CHRONY_RESTART_PATH_NAME = "ohana-chrony-restart.path"
 CHRONY_RESTART_REQUEST_PATH = "/run/ohana-agent/chrony-restart.request"
+APT_GET_EXECUTABLE = Path("/usr/bin/apt-get")
+APT_CONFIGURATION_DIRECTORY = Path("/etc/apt/apt.conf.d")
+APT_LISTS_CONFIGURATION_NAME = "20ohana-lists"
+SYSTEM_REFRESH_SERVICE_NAME = "ohana-system-refresh.service"
+SYSTEM_REFRESH_PATH_NAME = "ohana-system-refresh.path"
+SYSTEM_REFRESH_REQUEST_PATH = "/run/ohana-agent/system-refresh.request"
+SYSTEM_UPGRADE_SERVICE_NAME = "ohana-system-upgrade.service"
+SYSTEM_UPGRADE_PATH_NAME = "ohana-system-upgrade.path"
+SYSTEM_UPGRADE_REQUEST_PATH = "/run/ohana-agent/system-upgrade.request"
 NETWORK_ADMINISTRATION_MINIMUM_AGENT_VERSION = (1, 11, 0)
 DHCP_LEASE_PURGE_MINIMUM_AGENT_VERSION = (1, 11, 1)
 DISTRIBUTED_JOBS_TLS_MINIMUM_AGENT_VERSION = (1, 17, 0)
@@ -77,6 +86,7 @@ WAKE_ON_LAN_BATCHING_MINIMUM_AGENT_VERSION = (1, 26, 4)
 INFRA_LOG_SOURCE_MINIMUM_AGENT_VERSION = (1, 26, 12)
 SHIZUNE_COMPANION_MINIMUM_AGENT_VERSION = (1, 24, 0)
 CHRONY_RESTART_MINIMUM_AGENT_VERSION = (1, 34, 0)
+SYSTEM_UPDATE_MINIMUM_AGENT_VERSION = (1, 54, 0)
 
 
 class AdministrationPreparationError(RuntimeError):
@@ -95,6 +105,7 @@ class AdministrationPreparation:
     worker_tls_enabled: bool = False
     companion_enabled: bool = False
     chrony_restart_enabled: bool = False
+    system_update_enabled: bool = False
     units_installed: tuple[Path, ...] = ()
 
 
@@ -109,6 +120,8 @@ def prepare_administration(
     dnsmasq_executable: Path = DNSMASQ_EXECUTABLE,
     dnsmasq_configuration_directory: Path = (DNSMASQ_CONFIGURATION_DIRECTORY),
     chronyd_executable: Path = CHRONYD_EXECUTABLE,
+    apt_get_executable: Path = APT_GET_EXECUTABLE,
+    apt_configuration_directory: Path = APT_CONFIGURATION_DIRECTORY,
     systemd_directory: Path = SYSTEMD_SYSTEM_DIRECTORY,
     require_linux: bool = True,
     secure_ownership: bool = True,
@@ -310,6 +323,14 @@ def prepare_administration(
             *_install_chrony_restart_units(systemd_directory),
         )
 
+    system_update_enabled = supports_system_update(agent_version) and apt_get_executable.is_file()
+
+    if system_update_enabled:
+        installed_units = (
+            *installed_units,
+            *_install_system_update_units(systemd_directory, apt_configuration_directory),
+        )
+
     return AdministrationPreparation(
         configured=True,
         dhcp_enabled=dhcp_enabled,
@@ -319,6 +340,7 @@ def prepare_administration(
         worker_tls_enabled=jobs_tls_supported,
         companion_enabled=companion_supported,
         chrony_restart_enabled=chrony_restart_enabled,
+        system_update_enabled=system_update_enabled,
         units_installed=installed_units,
     )
 
@@ -333,6 +355,11 @@ def activate_administration(
     path_units = [
         *([DHCP_RELOAD_PATH_NAME] if preparation.dhcp_enabled else []),
         *([CHRONY_RESTART_PATH_NAME] if preparation.chrony_restart_enabled else []),
+        *(
+            [SYSTEM_REFRESH_PATH_NAME, SYSTEM_UPGRADE_PATH_NAME]
+            if preparation.system_update_enabled
+            else []
+        ),
     ]
 
     for path_unit in path_units:
@@ -1130,6 +1157,14 @@ def supports_chrony_restart(agent_version: str | None) -> bool:
     )
 
 
+def supports_system_update(agent_version: str | None) -> bool:
+    """Indiquer si l'Agent sait demander l'actualisation et la mise à jour apt."""
+    return _supports_agent_version(
+        agent_version,
+        minimum=SYSTEM_UPDATE_MINIMUM_AGENT_VERSION,
+    )
+
+
 def _supports_agent_version(
     agent_version: str | None,
     *,
@@ -1386,5 +1421,82 @@ def _install_chrony_restart_units(systemd_directory: Path) -> tuple[Path, ...]:
     for path, lines in units.items():
         path.write_text("\n".join([*lines, ""]), encoding="utf-8", newline="\n")
         path.chmod(0o644)
+
+    return tuple(units)
+
+
+def _install_system_update_units(
+    systemd_directory: Path, apt_configuration_directory: Path
+) -> tuple[Path, ...]:
+    """Installer les deux assistants apt demandés depuis Vision.
+
+    Chaque service root n'a qu'une commande fixe et sa propre unité de chemin :
+    le contenu d'une demande ne peut ni choisir une action ni ajouter un
+    argument. ``upgrade`` n'installe que les paquets déjà connus ou leurs
+    nouvelles dépendances (``--with-new-pkgs``), ne supprime rien, garde les
+    fichiers de configuration locaux et ne redémarre jamais la machine.
+    """
+    systemd_directory.mkdir(parents=True, exist_ok=True)
+    apt_configuration_directory.mkdir(parents=True, exist_ok=True)
+    environment = ["Environment=DEBIAN_FRONTEND=noninteractive", "Environment=LC_ALL=C"]
+    upgrade_command = (
+        "ExecStart=/usr/bin/apt-get -y --with-new-pkgs "
+        "-o Dpkg::Options::=--force-confold "
+        "-o Dpkg::Options::=--force-confdef upgrade"
+    )
+    helpers = (
+        (
+            SYSTEM_REFRESH_SERVICE_NAME,
+            SYSTEM_REFRESH_PATH_NAME,
+            SYSTEM_REFRESH_REQUEST_PATH,
+            "Refresh the apt package lists after an Ohana request",
+            "ExecStart=/usr/bin/apt-get update",
+            300,
+        ),
+        (
+            SYSTEM_UPGRADE_SERVICE_NAME,
+            SYSTEM_UPGRADE_PATH_NAME,
+            SYSTEM_UPGRADE_REQUEST_PATH,
+            "Apply the pending apt upgrades after an authorized Ohana request",
+            upgrade_command,
+            3600,
+        ),
+    )
+    units: dict[Path, list[str]] = {}
+    for service, path_unit, request, description, command, timeout in helpers:
+        units[systemd_directory / service] = [
+            "[Unit]",
+            f"Description={description}",
+            "",
+            "[Service]",
+            "Type=oneshot",
+            *environment,
+            command,
+            f"TimeoutStartSec={timeout}",
+        ]
+        units[systemd_directory / path_unit] = [
+            "[Unit]",
+            f"Description=Watch Ohana requests for {service}",
+            "",
+            "[Path]",
+            f"PathChanged={request}",
+            f"Unit={service}",
+            "",
+            "[Install]",
+            "WantedBy=multi-user.target",
+        ]
+    for path, lines in units.items():
+        path.write_text("\n".join([*lines, ""]), encoding="utf-8", newline="\n")
+        path.chmod(0o644)
+
+    # The timers apt already ships do nothing unless the lists are asked for.
+    lists_configuration = apt_configuration_directory / APT_LISTS_CONFIGURATION_NAME
+    lists_configuration.write_text(
+        "// Installed by Ohana-Installer: refresh the package lists daily.\n"
+        'APT::Periodic::Update-Package-Lists "1";\n',
+        encoding="utf-8",
+        newline="\n",
+    )
+    lists_configuration.chmod(0o644)
 
     return tuple(units)

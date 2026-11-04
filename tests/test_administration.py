@@ -303,6 +303,106 @@ def test_activate_administration_starts_the_chrony_path_unit(monkeypatch) -> Non
     assert enabled == started == [DHCP_RELOAD_PATH_NAME, CHRONY_RESTART_PATH_NAME]
 
 
+def _prepare_with_system_update(
+    tmp_path: Path, monkeypatch, *, agent_version: str | None, apt: bool
+):
+    for name in ("supports_distributed_jobs_tls", "supports_network_administration"):
+        monkeypatch.setattr(administration_module, name, lambda _version: False)
+    agent_configuration, infrastructure, vision_configuration = make_configuration_files(tmp_path)
+    apt_get = tmp_path / "apt-get"
+    if apt:
+        apt_get.touch()
+    systemd_directory = tmp_path / "systemd"
+    apt_directory = tmp_path / "apt.conf.d"
+    result = prepare_administration(
+        agent_configuration_path=agent_configuration,
+        agent_infrastructure_path=infrastructure,
+        agent_token_path=agent_configuration.parent / "management.token",
+        vision_configuration_path=vision_configuration,
+        vision_token_path=vision_configuration.parent / "management.token",
+        dnsmasq_executable=tmp_path / "missing-dnsmasq",
+        dnsmasq_configuration_directory=tmp_path / "dnsmasq.d",
+        chronyd_executable=tmp_path / "missing-chronyd",
+        apt_get_executable=apt_get,
+        apt_configuration_directory=apt_directory,
+        systemd_directory=systemd_directory,
+        require_linux=False,
+        secure_ownership=False,
+        agent_version=agent_version,
+    )
+    return result, systemd_directory, apt_directory
+
+
+def test_prepare_administration_installs_the_fixed_apt_helpers(tmp_path: Path, monkeypatch) -> None:
+    result, systemd_directory, apt_directory = _prepare_with_system_update(
+        tmp_path, monkeypatch, agent_version="1.54.0", apt=True
+    )
+
+    assert result.system_update_enabled is True
+    assert [path.name for path in result.units_installed] == [
+        "ohana-system-refresh.service",
+        "ohana-system-refresh.path",
+        "ohana-system-upgrade.service",
+        "ohana-system-upgrade.path",
+    ]
+    for action, command in (
+        ("refresh", "ExecStart=/usr/bin/apt-get update"),
+        (
+            "upgrade",
+            "ExecStart=/usr/bin/apt-get -y --with-new-pkgs "
+            "-o Dpkg::Options::=--force-confold "
+            "-o Dpkg::Options::=--force-confdef upgrade",
+        ),
+    ):
+        path_unit = (systemd_directory / f"ohana-system-{action}.path").read_text(encoding="utf-8")
+        assert f"PathChanged=/run/ohana-agent/system-{action}.request" in path_unit
+        assert f"Unit=ohana-system-{action}.service" in path_unit
+        service = (systemd_directory / f"ohana-system-{action}.service").read_text(encoding="utf-8")
+        # One fixed command per root service: a request cannot choose another.
+        assert [line for line in service.splitlines() if line.startswith("Exec")] == [command]
+        assert "Type=oneshot" in service
+        assert "Environment=DEBIAN_FRONTEND=noninteractive" in service
+    # Never removes packages and never reboots.
+    upgrade = (systemd_directory / "ohana-system-upgrade.service").read_text(encoding="utf-8")
+    assert "dist-upgrade" not in upgrade
+    assert "reboot" not in upgrade
+    lists = (apt_directory / "20ohana-lists").read_text(encoding="utf-8")
+    assert 'APT::Periodic::Update-Package-Lists "1";' in lists
+    assert "Unattended-Upgrade" not in lists
+
+
+@pytest.mark.parametrize(("agent_version", "apt"), [("1.53.0", True), ("1.54.0", False)])
+def test_prepare_administration_skips_apt_helpers_when_unusable(
+    tmp_path: Path, monkeypatch, agent_version: str, apt: bool
+) -> None:
+    result, systemd_directory, apt_directory = _prepare_with_system_update(
+        tmp_path, monkeypatch, agent_version=agent_version, apt=apt
+    )
+
+    assert result.system_update_enabled is False
+    assert result.units_installed == ()
+    assert not (systemd_directory / "ohana-system-upgrade.path").exists()
+    assert not (apt_directory / "20ohana-lists").exists()
+
+
+def test_activate_administration_starts_the_apt_path_units(monkeypatch) -> None:
+    enabled: list[str] = []
+    started: list[str] = []
+    monkeypatch.setattr("ohana_installer.administration.enable_systemd_service", enabled.append)
+    monkeypatch.setattr("ohana_installer.administration.start_systemd_service", started.append)
+
+    activate_administration(
+        AdministrationPreparation(
+            configured=True,
+            dhcp_enabled=False,
+            token_created=False,
+            system_update_enabled=True,
+        )
+    )
+
+    assert enabled == started == ["ohana-system-refresh.path", "ohana-system-upgrade.path"]
+
+
 def test_prepare_administration_secures_plugin_configurations(
     tmp_path: Path,
     monkeypatch,
