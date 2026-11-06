@@ -2,7 +2,7 @@ schema_version: 1
 
 platform:
   name: Ohana
-  version: "1.0.153"
+  version: "1.0.154"
 
 runtime:
   python:
@@ -39,12 +39,12 @@ components:
   agent:
     name: Ohana-Agent
     repository: cedric-HAOS/Ohana-Agent
-    version: "1.55.0"
-    release_tag: v1.55.0
+    version: "1.56.0"
+    release_tag: v1.56.0
 
     package:
       type: wheel
-      filename: ohana_agent-1.55.0-py3-none-any.whl
+      filename: ohana_agent-1.56.0-py3-none-any.whl
 
     configuration:
       directory: /etc/ohana-agent
@@ -153,12 +153,12 @@ components:
   shizune:
     name: Ohana-Shizune
     repository: cedric-HAOS/Ohana-Shizune
-    version: "0.5.0"
-    release_tag: v0.5.0
+    version: "0.5.1"
+    release_tag: v0.5.1
 
     package:
       type: static
-      filename: shizune-pwa-0.5.0.tar.gz
+      filename: shizune-pwa-0.5.1.tar.gz
 
     static:
       directory: /var/www/shizune
