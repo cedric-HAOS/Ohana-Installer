@@ -8,6 +8,10 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+## [1.19.0] — 2026-11-07 — `plugins/zwave
+
+- `plugins/zwave.yaml` reçoit les réglages que le modèle livré ajoute (Agent 1.57.0 ou plus récent : délais d'alerte sans contact) : à l'installation et à la mise à jour, les clés absentes du fichier local sont ajoutées en fin de fichier avec leurs commentaires. Une clé déjà présente, sa valeur et les commentaires locaux ne sont jamais modifiés ; les autres fichiers de configuration restent conservés tels quels.
+
 ## [1.18.0] — 2026-11-04 — Assistants apt demandés depuis Vision (Agent 1
 
 - Assistants apt demandés depuis Vision (Agent 1.54.0 ou plus récent et `/usr/bin/apt-get` présent) : `ohana-system-refresh` (`apt-get update`) et `ohana-system-upgrade` (`apt-get -y --with-new-pkgs`, fichiers de configuration locaux conservés). Chaque service root a une commande fixe et sa propre unité de chemin sur `/run/ohana-agent/system-refresh.request` ou `system-upgrade.request` : le contenu d'une demande ne choisit ni l'action ni un argument. Aucun paquet n'est supprimé et la machine n'est jamais redémarrée.
