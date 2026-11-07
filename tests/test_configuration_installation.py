@@ -139,6 +139,51 @@ def test_install_configuration_file_preserves_existing_file(
     assert destination.read_text(encoding="utf-8") == "local: true\n"
 
 
+def test_install_configuration_file_completes_additive_configuration(
+    tmp_path: Path,
+) -> None:
+    downloaded_file = _build_downloaded_configuration(
+        tmp_path,
+        source="zwave.example.yaml",
+        destination=Path("plugins/zwave.yaml"),
+    )
+    downloaded_file.path.write_text(
+        "enabled: true\nlast_seen_alert_minutes: 60\n", encoding="utf-8"
+    )
+    configuration = downloaded_file.component.configuration
+    assert configuration is not None
+
+    destination = configuration.directory / "plugins/zwave.yaml"
+    destination.parent.mkdir(parents=True)
+    destination.write_text("enabled: false\n", encoding="utf-8")
+
+    installed_file = _install_configuration_file(downloaded_file)
+
+    assert installed_file.created is False
+    assert installed_file.added_keys == ("last_seen_alert_minutes",)
+    assert destination.read_text(encoding="utf-8") == (
+        "enabled: false\nlast_seen_alert_minutes: 60\n"
+    )
+
+
+def test_install_configuration_file_leaves_other_configurations_untouched(
+    tmp_path: Path,
+) -> None:
+    downloaded_file = _build_downloaded_configuration(tmp_path)
+    downloaded_file.path.write_text("enabled: true\nextra: 1\n", encoding="utf-8")
+    configuration = downloaded_file.component.configuration
+    assert configuration is not None
+
+    destination = configuration.directory / "plugins/dns.yaml"
+    destination.parent.mkdir(parents=True)
+    destination.write_text("enabled: false\n", encoding="utf-8")
+
+    installed_file = _install_configuration_file(downloaded_file)
+
+    assert installed_file.added_keys == ()
+    assert destination.read_text(encoding="utf-8") == "enabled: false\n"
+
+
 def test_install_configuration_file_rejects_directory_destination(
     tmp_path: Path,
 ) -> None:

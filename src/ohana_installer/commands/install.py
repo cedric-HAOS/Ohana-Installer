@@ -19,7 +19,9 @@ from ohana_installer.administration import (
 )
 from ohana_installer.age_identity import AgeIdentityError, ensure_local_identity
 from ohana_installer.configuration_migrations import (
+    ADDITIVE_CONFIGURATIONS,
     ConfigurationMigrationError,
+    add_missing_configuration_keys,
     migrate_backup_configuration,
 )
 from ohana_installer.confirmation import confirm_action
@@ -120,6 +122,7 @@ class InstalledConfigurationFile:
     destination_path: Path
     group_name: str
     created: bool
+    added_keys: tuple[str, ...] = ()
 
 
 def _reload_systemd() -> None:
@@ -462,6 +465,16 @@ def _install_configuration_file(
                 f"Impossible d'installer {destination_path} : {error}"
             ) from error
 
+    added_keys: tuple[str, ...] = ()
+
+    relative_destination = downloaded_file.configuration_file.destination.as_posix()
+
+    if not created and relative_destination in ADDITIVE_CONFIGURATIONS:
+        try:
+            added_keys = add_missing_configuration_keys(source_path, destination_path)
+        except ConfigurationMigrationError as error:
+            raise ConfigurationInstallationError(str(error)) from error
+
     try:
         _secure_configuration_path(
             destination_path,
@@ -481,6 +494,7 @@ def _install_configuration_file(
         destination_path=destination_path,
         group_name=group_name,
         created=created,
+        added_keys=added_keys,
     )
 
 
@@ -1026,6 +1040,9 @@ def display_installed_configurations(
 
         if installed_configuration.created:
             print(f"✓ {destination} installé ({ownership}).")
+        elif installed_configuration.added_keys:
+            keys = ", ".join(installed_configuration.added_keys)
+            print(f"✓ {destination} conservé ({ownership}) ; réglages ajoutés : {keys}.")
         else:
             print(f"✓ {destination} conservé (configuration locale existante, {ownership}).")
 
