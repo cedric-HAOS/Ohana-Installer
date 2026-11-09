@@ -43,6 +43,7 @@ AGENT_PLUGIN_CONFIGURATION_FILENAMES = (
     "ntp.yaml",
     "mqtt.yaml",
     "home-assistant-telemetry.yaml",
+    "power-plug.yaml",
 )
 
 VISION_CONFIGURATION_DIRECTORY = Path("/etc/ohana-vision")

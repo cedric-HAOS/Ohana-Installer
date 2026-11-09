@@ -471,6 +471,7 @@ def test_repository_manifest_is_valid() -> None:
         ("home-assistant-telemetry.example.yaml", "plugins/home-assistant-telemetry.yaml"),
         ("teleinformation.example.yaml", "plugins/teleinformation.yaml"),
         ("zwave.example.yaml", "plugins/zwave.yaml"),
+        ("power-plug.example.yaml", "plugins/power-plug.yaml"),
     )
     assert agent.service.arguments == (
         "--config",

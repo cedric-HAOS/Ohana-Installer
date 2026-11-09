@@ -88,6 +88,9 @@ components:
         - source: zwave.example.yaml
           destination: plugins/zwave.yaml
 
+        - source: power-plug.example.yaml
+          destination: plugins/power-plug.yaml
+
     service:
       filename: ohana-agent.service
       description: Ohana Agent
