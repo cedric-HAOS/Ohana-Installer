@@ -20,6 +20,18 @@ from ohana_installer.administration import (
 )
 
 
+@pytest.fixture(autouse=True)
+def isolated_apt(tmp_path: Path, monkeypatch) -> None:
+    """Never touch the real /etc/apt, whatever the machine running the tests.
+
+    A CI runner has /usr/bin/apt-get, so a test that does not ask for apt would
+    otherwise try to write /etc/apt/apt.conf.d (Permission denied).
+    """
+    defaults = prepare_administration.__kwdefaults__
+    monkeypatch.setitem(defaults, "apt_get_executable", tmp_path / "missing-apt-get")
+    monkeypatch.setitem(defaults, "apt_configuration_directory", tmp_path / "apt.conf.d")
+
+
 def make_configuration_files(
     temporary_path: Path,
 ) -> tuple[Path, Path, Path]:
