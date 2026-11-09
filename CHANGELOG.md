@@ -8,6 +8,8 @@ Le format s'inspire de **Keep a Changelog** et respecte le **Versioning Sémanti
 
 ## Non publié
 
+## [1.20.0] — 2026-11-09 — `plugins/power-plug
+
 - `plugins/power-plug.yaml` (plugin « Prise connectée » de l'Agent, qui porte le jeton Home Assistant de la prise de Bubule) rejoint les configurations de plugin que l'Installer rend modifiables par l'Agent (groupe `ohana-agent`, mode 660) à l'installation, à la mise à jour et à la restauration. Le fichier lui-même est créé par la mise à jour depuis le modèle `power-plug.example.yaml` livré par l'Agent, jamais écrasé s'il existe.
 
 ## [1.19.0] — 2026-11-07 — `plugins/zwave
