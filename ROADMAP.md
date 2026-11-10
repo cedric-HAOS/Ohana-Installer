@@ -6,6 +6,100 @@ L'objectif du projet est de fournir un installateur simple, fiable et reproducti
 
 ---
 
+# État au 10 novembre 2026
+
+Version publiée : **1.20.0**, avec le catalogue aligné sur Ohana-Platform 1.0.157
+(Agent 1.58.1, Vision 1.45.0, Shizune 0.5.1). Le numéro courant fait foi dans
+`pyproject.toml` et le [CHANGELOG](CHANGELOG.md) : cette page ne suit pas chaque
+release ni chaque synchronisation du catalogue.
+
+Depuis la 1.9.0, l'Installer n'a plus de feuille de route propre : il suit les
+besoins des phases de la [roadmap commune](https://github.com/cedric-HAOS/Ohana-Platform/blob/main/ROADMAP.md).
+Les sections ci-dessous résument ce que chaque version a livré.
+
+Reste ouvert : aucune restauration HAOS n'a été déclarée (Phase 10), et la
+restauration réelle d'INFRA-01 du 9 octobre 2026 reste à déclarer dans le
+registre de l'Agent si elle est jugée complète.
+
+---
+
+# Version 1.20.0 — Prise connectée
+
+**Statut : terminée.**
+
+* [x] Rendre `plugins/power-plug.yaml` modifiable par l'Agent à l'installation,
+  à la mise à jour et à la restauration.
+
+# Version 1.19.0 — Nouveaux réglages ajoutés aux fichiers locaux
+
+**Statut : terminée.**
+
+* [x] Ajouter à `plugins/zwave.yaml` les clés que le modèle livré apporte, sans
+  toucher aux valeurs ni aux commentaires existants.
+
+# Version 1.18.0 — Assistants de mise à jour du système
+
+**Statut : terminée.**
+
+* [x] Fournir `ohana-system-refresh` et `ohana-system-upgrade`, chacun avec sa
+  commande fixe et son unité de chemin : le privilège root ne revient jamais à
+  l'Agent.
+* [x] Rafraîchir les listes de paquets chaque jour, sans mise à jour ni
+  redémarrage automatiques.
+
+# Version 1.17.0 — Compte rendu de restauration
+
+**Statut : terminée.**
+
+* [x] Écrire après `ohana restore` un compte rendu JSON sans secret (résultat,
+  étape atteinte, sauvegarde utilisée) que l'Agent enregistre.
+* [x] Ne laisser aucun compte rendu après une annulation.
+
+# Version 1.16.0 — Capacité de synchronisation AdGuard
+
+**Statut : terminée.**
+
+* [x] Installer le moteur de synchronisation, vérifié par SHA-256, avec son
+  service, son timer et sa configuration ; inactif sur une installation neuve.
+* [x] Le reconstruire à la restauration, même depuis une ancienne sauvegarde.
+
+# Versions 1.15.3 à 1.15.6 — Restauration réelle d'INFRA-01
+
+**Statut : terminées (corrections faites pendant la reconstruction du 9 octobre 2026).**
+
+* [x] Accepter les descripteurs chiffrés contenant `contents`.
+* [x] Reconnaître `etc/dnsmasq.d` comme un dossier.
+* [x] Contrôler SQLite avant application et retirer les fichiers WAL résiduels.
+* [x] Rétablir les permissions DHCP et celles de `rclone.conf`.
+* [x] Importer les autorisations durables Katsuyu et Shizune.
+
+# Versions 1.15.0 à 1.15.2 — Réparations supervisées et iCloud
+
+**Statut : terminées.**
+
+* [x] Fournir l'assistant de redémarrage de chrony demandé par l'Agent.
+* [x] Ne plus bloquer une mise à jour quand la copie iCloud de la clé `age`
+  échoue pour une identité déjà existante.
+
+# Versions 1.10.0 à 1.14.4 — Katsuyu, Shizune et journaux de Tsunade
+
+**Statut : terminées.**
+
+* [x] Provisionner l'autorité locale et le certificat du listener worker Katsuyu.
+* [x] Migrer le canal compagnon Shizune et l'identité Wake-on-LAN de Katsuyu.
+* [x] Installer la PWA Shizune servie par Vision.
+* [x] Migrer la configuration des sources de journaux sans modifier ses autres
+  valeurs.
+
+# Versions 1.9.0 à 1.9.7 — Identité age et restauration iCloud
+
+**Statut : terminées.**
+
+* [x] Gérer l'identité `age` d'INFRA-01 et la récupérer depuis iCloud.
+* [x] Choisir la sauvegarde iCloud à restaurer et vérifier la connexion au
+  démarrage.
+* [x] Restaurer les archives INFRA-01 compressées.
+
 # Version 1.8.0 — Capacités et restauration d'INFRA-01
 
 **Statut : terminée.**
